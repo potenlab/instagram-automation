@@ -1,0 +1,157 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>브랜드 — POTENSTUDIO</title>
+<link rel="stylesheet" href="/style.css">
+</head>
+<body>
+<div class="gridbg"></div>
+<div class="shell">
+  <aside class="sidebar">
+    <a class="wordmark" href="/index.html">
+      <div class="glyph">+</div>
+      <div class="name">POTEN<span>STUDIO</span></div>
+    </a>
+    <div class="microlabel">Content Factory</div>
+    <a class="nav-item" href="/index.html"><span class="ico"></span>자료함</a>
+    <a class="nav-item" href="/queue.html"><span class="ico"></span>대기열</a>
+    <a class="nav-item active" href="/brands.html"><span class="ico"></span>브랜드</a>
+    <a class="nav-item" href="/settings.html"><span class="ico"></span>설정</a>
+    <div class="foot"><span class="dot-live"></span>모든 시스템 정상</div>
+  </aside>
+
+  <main class="content">
+    <div class="pagehead reveal" style="display:flex;align-items:flex-end;justify-content:space-between;gap:20px">
+      <div>
+        <div class="microlabel">Brands</div>
+        <h1>브랜드</h1>
+        <p>브랜드마다 인스타그램 계정 · Discord 채널 · 템플릿을 따로 설정합니다.</p>
+      </div>
+      <button class="secondary" id="new" style="flex:none">+ 브랜드 추가</button>
+    </div>
+
+    <div class="brand-grid reveal d1" id="grid"></div>
+
+    <form id="f" class="panel reveal" style="display:none; max-width:640px; margin-top:22px">
+      <div class="microlabel" style="margin-bottom:6px">Edit</div>
+      <h1 id="ftitle" style="font-size:19px;font-weight:800;margin-bottom:14px">브랜드 편집</h1>
+      <input type="hidden" id="bid">
+      <label for="name">이름</label>
+      <input type="text" id="name">
+      <label for="handle">핸들 <span style="font-weight:500;color:var(--faint)">예: @potenstudio</span></label>
+      <input type="text" id="handle">
+      <label for="discord_channel_id">Discord 채널 ID</label>
+      <input type="text" id="discord_channel_id">
+      <label for="ig_account_id">Zernio IG 계정 ID</label>
+      <input type="text" id="ig_account_id">
+      <label for="rss_feeds">RSS 피드 <span style="font-weight:500;color:var(--faint)">쉼표로 구분</span></label>
+      <input type="text" id="rss_feeds">
+      <label for="template">템플릿 파일</label>
+      <input type="text" id="template" placeholder="slide.html">
+      <label for="prompt_rules">카피 규칙 <span style="font-weight:500;color:var(--faint)">프롬프트에 추가됨</span></label>
+      <textarea id="prompt_rules"></textarea>
+      <div style="margin-top:20px; display:flex; gap:10px">
+        <button type="submit">저장</button>
+        <button type="button" class="secondary" id="cancel">취소</button>
+      </div>
+      <div class="error" id="err"></div>
+    </form>
+  </main>
+</div>
+<script>
+const $ = id => document.getElementById(id);
+const FIELDS = ['name', 'handle', 'discord_channel_id', 'ig_account_id', 'rss_feeds', 'template', 'prompt_rules'];
+let brands = [];
+
+async function api(url, opts) {
+  const res = await fetch(url, opts);
+  if (res.status === 401) { location.href = '/login.html'; throw new Error('unauthorized'); }
+  return res;
+}
+
+function el(tag, cls, text) {
+  const e = document.createElement(tag);
+  if (cls) e.className = cls;
+  if (text != null) e.textContent = text;
+  return e;
+}
+
+function row(k, v, ok) {
+  const r = el('div', 'row');
+  r.appendChild(el('span', 'k', k));
+  const val = el('span', 'v' + (ok ? ' ok' : ''), v);
+  r.appendChild(val);
+  return r;
+}
+
+async function load() {
+  brands = await (await api('/api/brands')).json();
+  const grid = $('grid');
+  grid.innerHTML = '';
+  for (const b of brands) {
+    const card = el('div', 'panel hoverable brand-card');
+    const name = el('div', 'bname', b.name);
+    if (b.handle) {
+      const s = document.createElement('small');
+      s.textContent = b.handle;
+      name.appendChild(s);
+    }
+    card.appendChild(name);
+
+    const rows = el('div', 'rows');
+    rows.appendChild(row('Discord', b.discord_channel_id ? '연결됨' : '미설정', !!b.discord_channel_id));
+    rows.appendChild(row('Instagram', b.ig_account_id ? '연결됨' : '미설정', !!b.ig_account_id));
+    rows.appendChild(row('RSS', b.rss_feeds ? '활성' : '—', !!b.rss_feeds));
+    rows.appendChild(row('템플릿', b.template || 'slide.html'));
+    card.appendChild(rows);
+
+    const actions = el('div', 'actions');
+    const edit = el('button', 'secondary', '수정'); edit.type = 'button';
+    edit.onclick = () => openForm(b);
+    const del = el('button', 'danger', '삭제'); del.type = 'button';
+    del.onclick = async () => {
+      if (!confirm(`"${b.name}" 브랜드를 삭제할까요?`)) return;
+      await api('/api/brands/' + b.id, { method: 'DELETE' });
+      load();
+    };
+    actions.appendChild(edit); actions.appendChild(del);
+    card.appendChild(actions);
+    grid.appendChild(card);
+  }
+}
+
+function openForm(b) {
+  $('f').style.display = '';
+  $('ftitle').textContent = b ? '브랜드 편집 — ' + b.name : '브랜드 추가';
+  $('bid').value = b ? b.id : '';
+  for (const f of FIELDS) $(f).value = b ? (b[f] || '') : (f === 'template' ? 'slide.html' : '');
+  $('err').textContent = '';
+  $('f').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  $('name').focus();
+}
+
+$('new').onclick = () => openForm(null);
+$('cancel').onclick = () => { $('f').style.display = 'none'; };
+
+$('f').onsubmit = async (e) => {
+  e.preventDefault();
+  if (!$('name').value.trim()) { $('err').textContent = '이름을 입력하세요'; return; }
+  const body = {};
+  for (const f of FIELDS) body[f] = $(f).value.trim();
+  const id = $('bid').value;
+  const res = await api(id ? '/api/brands/' + id : '/api/brands', {
+    method: id ? 'PUT' : 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) { $('err').textContent = (await res.json()).error || '저장 실패'; return; }
+  $('f').style.display = 'none';
+  load();
+};
+
+load();
+</script>
+</body>
+</html>

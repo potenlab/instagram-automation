@@ -1,0 +1,8 @@
+node_modules/
+out/
+template/.render-tmp*.html
+.env
+app/data.db
+app/uploads/
+app/data.db*
+.DS_Store

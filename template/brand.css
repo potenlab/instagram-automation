@@ -1,0 +1,88 @@
+/* Brand tokens — potenlab-inspired. Swap values here to rebrand. */
+:root {
+  --bg: #0e1116;
+  --text: #ffffff;
+  --text-sub: #b6bec9;
+  --accent: #0079ff;
+  --accent-lime: #d8ff84;
+  --font: 'Pretendard Variable', Pretendard, 'Noto Sans KR', sans-serif;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+html, body { width: 1080px; height: 1350px; }
+
+body {
+  font-family: var(--font);
+  background: var(--bg);
+  color: var(--text);
+  overflow: hidden;
+  position: relative;
+}
+
+.bg {
+  position: absolute; inset: 0;
+  background-size: cover; background-position: center;
+}
+.bg::after {
+  content: ''; position: absolute; inset: 0;
+  background: linear-gradient(180deg, rgba(14,17,22,.45) 0%, rgba(14,17,22,.72) 55%, rgba(14,17,22,.94) 100%);
+}
+
+.frame {
+  position: absolute; inset: 0;
+  display: flex; flex-direction: column;
+  padding: 72px 84px 64px;
+}
+
+/* top bar */
+.topbar { display: flex; justify-content: space-between; align-items: center; }
+.logo { font-weight: 800; font-size: 34px; letter-spacing: -0.02em; }
+.logo .dot { color: var(--accent); }
+.pagenum {
+  font-weight: 700; font-size: 26px; color: #0e1116;
+  background: var(--accent-lime); border-radius: 999px; padding: 8px 22px;
+}
+
+/* content area */
+.content { flex: 1; display: flex; flex-direction: column; justify-content: flex-end; }
+
+.badge {
+  align-self: flex-start; font-weight: 700; font-size: 26px; letter-spacing: .12em;
+  color: var(--accent-lime); border: 2px solid var(--accent-lime);
+  border-radius: 999px; padding: 10px 28px; margin-bottom: 40px;
+}
+
+.headline {
+  font-weight: 800; letter-spacing: -0.03em; line-height: 1.22;
+  white-space: pre-line; word-break: keep-all;
+}
+.headline .hl { color: var(--accent); }
+
+.sub, .body {
+  color: var(--text-sub); line-height: 1.62; word-break: keep-all; white-space: pre-line;
+}
+
+/* cover */
+.cover .headline { font-size: 96px; margin-bottom: 36px; }
+.cover .sub { font-size: 40px; }
+
+/* body slide */
+.slide-body .headline { font-size: 68px; margin-bottom: 34px; }
+.slide-body .body { font-size: 40px; }
+
+/* cta slide */
+.cta .content { justify-content: center; align-items: center; text-align: center; }
+.cta .headline { font-size: 80px; margin-bottom: 30px; }
+.cta .body { font-size: 38px; margin-bottom: 56px; }
+.cta .button {
+  font-weight: 800; font-size: 40px; color: #fff;
+  background: var(--accent); border-radius: 999px; padding: 26px 64px;
+}
+
+/* footer */
+.footer {
+  margin-top: 56px; display: flex; justify-content: space-between; align-items: center;
+  font-size: 26px; color: var(--text-sub); font-weight: 600;
+}
+.footer .swipe { color: var(--accent-lime); }

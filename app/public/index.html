@@ -1,0 +1,284 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>자료함 — POTENSTUDIO</title>
+<link rel="stylesheet" href="/style.css">
+</head>
+<body>
+<div class="gridbg"></div>
+<div class="shell">
+  <aside class="sidebar">
+    <a class="wordmark" href="/index.html">
+      <div class="glyph">+</div>
+      <div class="name">POTEN<span>STUDIO</span></div>
+    </a>
+    <div class="microlabel">Content Factory</div>
+    <a class="nav-item active" href="/index.html"><span class="ico"></span>자료함</a>
+    <a class="nav-item" href="/queue.html"><span class="ico"></span>대기열</a>
+    <a class="nav-item" href="/brands.html"><span class="ico"></span>브랜드</a>
+    <a class="nav-item" href="/settings.html"><span class="ico"></span>설정</a>
+    <div class="foot"><span class="dot-live"></span>모든 시스템 정상</div>
+  </aside>
+
+  <main class="content content-wide">
+    <div class="pagehead reveal">
+      <div class="microlabel">Materials</div>
+      <h1>자료함</h1>
+      <p>사진과 메모를 넣어두면, 매일 아침 AI가 하나씩 꺼내 카드뉴스를 만들고 Discord로 승인을 요청합니다.</p>
+    </div>
+
+    <div class="mat-layout">
+      <form id="f" class="panel reveal d1">
+        <label>브랜드</label>
+        <div class="brand-pills" id="brandPills"></div>
+
+        <label for="topic" style="margin-top:22px">주제 / 기사 URL <span class="opt">선택 — 비우면 AI가 사진을 보고 정합니다</span></label>
+        <textarea id="topic" placeholder="예: 포텐스튜디오 공간 소개 / 기사 URL / 비워두기"></textarea>
+
+        <label style="margin-top:22px">자료 이미지 <span class="opt" id="fileCount">0 / 10</span></label>
+        <div class="dropzone dz-lg" id="dz">
+          <div class="dz-icon">+</div>
+          <div class="dz-title">사진을 끌어다 놓거나 클릭해서 추가</div>
+          <div class="dz-sub">여러 번 나눠 추가 가능 · 장당 최대 10MB · AI가 내용을 읽고, 어울리는 슬라이드의 배경으로도 씁니다</div>
+          <input type="file" id="materials" multiple accept="image/*">
+        </div>
+        <div id="previews" class="file-grid"></div>
+
+        <label for="note" style="margin-top:22px">자료 설명 <span class="opt">선택</span></label>
+        <input type="text" id="note" placeholder="예: 지난주 스튜디오 촬영본이야, 첫 번째 사진을 커버로 써줘">
+
+        <div class="submit-row">
+          <button type="submit" id="submit">자료함에 저장 <span class="arr">→</span></button>
+          <span class="muted" style="font-size:12.5px">매일 아침 브랜드당 1건씩 자동 생성 · 자료함이 비면 RSS에서 가져옵니다</span>
+        </div>
+        <div class="error" id="err"></div>
+      </form>
+
+      <aside class="reveal d2">
+        <div class="panel stock-panel">
+          <div class="microlabel" style="margin-bottom:2px">Stocked</div>
+          <h2 class="stock-title">대기 중인 자료 <span id="stockCount" class="count-chip">0</span></h2>
+          <div id="stockList"></div>
+        </div>
+        <div class="panel source-panel" style="margin-top:14px">
+          <div class="microlabel" style="margin-bottom:2px">Sources</div>
+          <h2 class="stock-title">뉴스 소스</h2>
+          <p class="muted" style="font-size:12px;margin:6px 0 12px;line-height:1.5">자료함이 비어 있을 때 여기서 체크된 소스의 최신 기사를 가져옵니다. 저장은 자동입니다.</p>
+          <div id="sourceList"></div>
+          <div class="src-add">
+            <input type="text" id="customFeed" placeholder="https://example.com/feed.xml">
+            <button type="button" class="secondary" id="addFeed">추가</button>
+          </div>
+        </div>
+
+        <div class="panel pipeline-panel">
+          <div class="microlabel" style="margin-bottom:10px">Every morning</div>
+          <div class="steps">
+            <div class="step-line"><span class="d"></span>자료함에서 1건 선택</div>
+            <div class="step-line"><span class="d"></span>AI 카피 + 디자인</div>
+            <div class="step-line"><span class="d"></span>Discord 승인 요청</div>
+            <div class="step-line"><span class="d lime"></span>Instagram 게시</div>
+          </div>
+        </div>
+      </aside>
+    </div>
+  </main>
+</div>
+<div class="toast" id="toast"></div>
+<script>
+const $ = id => document.getElementById(id);
+let brands = [], brandId = null, picked = [];
+
+async function api(url, opts) {
+  const res = await fetch(url, opts);
+  if (res.status === 401) { location.href = '/login.html'; throw new Error('unauthorized'); }
+  return res;
+}
+
+function toast(msg) {
+  const t = $('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2600);
+}
+
+// --- brand pills ---
+async function loadBrands() {
+  brands = await (await api('/api/brands')).json();
+  if (!brandId && brands.length) brandId = brands[0].id;
+  const box = $('brandPills');
+  box.innerHTML = '';
+  for (const b of brands) {
+    const p = document.createElement('button');
+    p.type = 'button';
+    p.className = 'pill' + (b.id === brandId ? ' on' : '');
+    p.textContent = b.name;
+    p.onclick = () => { brandId = b.id; loadBrands(); loadStock(); renderSources(); };
+    box.appendChild(p);
+  }
+}
+
+// --- files (akumulasi + hapus per file) ---
+const dz = $('dz'), input = $('materials');
+dz.onclick = () => input.click();
+dz.ondragover = e => { e.preventDefault(); dz.classList.add('over'); };
+dz.ondragleave = () => dz.classList.remove('over');
+dz.ondrop = e => { e.preventDefault(); dz.classList.remove('over'); addFiles(e.dataTransfer.files); };
+input.onchange = () => { addFiles(input.files); input.value = ''; };
+
+function addFiles(list) {
+  for (const f of list) {
+    if (!f.type.startsWith('image/')) continue;
+    if (f.size > 10 * 1024 * 1024) { toast(f.name + ' — 10MB 초과'); continue; }
+    if (picked.length >= 10) { toast('최대 10장까지 가능합니다'); break; }
+    picked.push(f);
+  }
+  renderPreviews();
+}
+
+function fmtSize(n) { return n > 1048576 ? (n / 1048576).toFixed(1) + 'MB' : Math.round(n / 1024) + 'KB'; }
+
+function renderPreviews() {
+  $('fileCount').textContent = picked.length + ' / 10';
+  const box = $('previews');
+  box.innerHTML = '';
+  picked.forEach((f, i) => {
+    const card = document.createElement('div');
+    card.className = 'file-card';
+    const img = document.createElement('img');
+    img.src = URL.createObjectURL(f);
+    const meta = document.createElement('div');
+    meta.className = 'fmeta';
+    meta.innerHTML = `<span class="fname"></span><span class="fsize">${fmtSize(f.size)}</span>`;
+    meta.querySelector('.fname').textContent = f.name;
+    const x = document.createElement('button');
+    x.type = 'button'; x.className = 'fx'; x.textContent = '×';
+    x.onclick = () => { picked.splice(i, 1); renderPreviews(); };
+    const num = document.createElement('span');
+    num.className = 'fnum'; num.textContent = i + 1;
+    card.append(img, num, meta, x);
+    box.appendChild(card);
+  });
+}
+
+// --- stock list (kanan) ---
+async function loadStock() {
+  const jobs = await (await api('/api/jobs?limit=100')).json();
+  const stock = jobs.filter(j => j.status === 'stock' && j.brand_id === brandId);
+  $('stockCount').textContent = stock.length;
+  const box = $('stockList');
+  box.innerHTML = '';
+  if (!stock.length) {
+    box.innerHTML = '<p class="muted" style="font-size:13px;margin-top:10px">비어 있어요 — 내일 아침엔 RSS에서 가져옵니다.</p>';
+    return;
+  }
+  stock.forEach((j, i) => {
+    const row = document.createElement('div');
+    row.className = 'stock-item';
+    const next = i === 0 ? '<span class="next-chip">내일 아침</span>' : '';
+    row.innerHTML = `<div class="si-top"><strong>#${j.id}</strong>${next}<span class="si-date">${(j.created_at || '').slice(5, 16).replace('T', ' ')}</span></div>
+      <div class="si-topic"></div>
+      <div class="si-meta">사진 ${j.material_count || 0}장</div>`;
+    row.querySelector('.si-topic').textContent = j.topic ? (j.topic.length > 60 ? j.topic.slice(0, 60) + '…' : j.topic) : '(주제 없음 — AI가 사진 보고 결정)';
+    const del = document.createElement('button');
+    del.type = 'button'; del.className = 'fx si-del'; del.textContent = '×';
+    del.onclick = async () => {
+      if (!confirm('#' + j.id + ' 자료를 삭제할까요?')) return;
+      await api('/api/jobs/' + j.id, { method: 'DELETE' });
+      loadStock();
+    };
+    row.appendChild(del);
+    box.appendChild(row);
+  });
+}
+
+// --- news sources (per brand, auto-save ke brand.rss_feeds) ---
+const SOURCE_CATALOG = [
+  { name: 'TechCrunch', url: 'https://techcrunch.com/feed/' },
+  { name: 'Ars Technica', url: 'https://feeds.arstechnica.com/arstechnica/index' },
+  { name: 'Engadget', url: 'https://www.engadget.com/rss.xml' },
+  { name: 'VentureBeat', url: 'https://venturebeat.com/feed/' },
+  { name: 'MIT Tech Review', url: 'https://www.technologyreview.com/feed/' },
+  { name: 'Wired', url: 'https://www.wired.com/feed/rss' },
+];
+
+function brandFeeds() {
+  const b = brands.find(x => x.id === brandId);
+  return (b?.rss_feeds || '').split(',').map(s => s.trim()).filter(Boolean);
+}
+
+async function saveFeeds(feeds) {
+  const res = await api('/api/brands/' + brandId, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ rss_feeds: feeds.join(',') }),
+  });
+  if (res.ok) {
+    const b = brands.find(x => x.id === brandId);
+    if (b) b.rss_feeds = feeds.join(',');
+    toast('소스가 저장되었습니다 ✓');
+  }
+  renderSources();
+}
+
+function renderSources() {
+  const active = brandFeeds();
+  const box = $('sourceList');
+  box.innerHTML = '';
+  const customs = active.filter(u => !SOURCE_CATALOG.some(s => s.url === u));
+  const rows = [...SOURCE_CATALOG, ...customs.map(u => ({ name: u.replace(/^https?:\/\/(www\.)?/, '').split('/')[0], url: u, custom: true }))];
+  for (const s of rows) {
+    const on = active.includes(s.url);
+    const row = document.createElement('label');
+    row.className = 'src-row' + (on ? ' on' : '');
+    row.innerHTML = `<span class="src-check">${on ? '✓' : ''}</span><span class="src-name"></span>${s.custom ? '<span class="src-tag">custom</span>' : ''}`;
+    row.querySelector('.src-name').textContent = s.name;
+    row.title = s.url;
+    row.onclick = (e) => {
+      e.preventDefault();
+      const next = on ? active.filter(u => u !== s.url) : [...active, s.url];
+      saveFeeds(next);
+    };
+    box.appendChild(row);
+  }
+}
+
+$('addFeed').onclick = () => {
+  const url = $('customFeed').value.trim();
+  if (!/^https:\/\/.+/.test(url)) { toast('https:// 로 시작하는 피드 주소를 넣어주세요'); return; }
+  if (brandFeeds().includes(url)) { toast('이미 추가된 소스입니다'); return; }
+  $('customFeed').value = '';
+  saveFeeds([...brandFeeds(), url]);
+};
+
+// --- submit ---
+$('f').onsubmit = async (e) => {
+  e.preventDefault();
+  $('err').textContent = '';
+  if (!$('topic').value.trim() && !picked.length) { $('err').textContent = '주제 또는 자료 이미지를 넣어주세요'; return; }
+  $('submit').disabled = true;
+  const fd = new FormData();
+  fd.append('brand_id', brandId);
+  fd.append('topic', $('topic').value.trim());
+  fd.append('note', $('note').value);
+  for (const f of picked) fd.append('materials', f);
+  try {
+    const res = await api('/api/jobs', { method: 'POST', body: fd });
+    if (!res.ok) throw new Error((await res.json()).error || '오류가 발생했습니다');
+    picked = []; $('topic').value = ''; $('note').value = '';
+    renderPreviews();
+    toast('자료함에 저장되었습니다 ✓');
+    loadStock();
+  } catch (err) {
+    $('err').textContent = err.message;
+  } finally {
+    $('submit').disabled = false;
+  }
+};
+
+loadBrands().then(() => { loadStock(); renderSources(); });
+</script>
+</body>
+</html>

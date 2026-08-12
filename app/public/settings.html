@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>설정 — POTENSTUDIO</title>
+<link rel="stylesheet" href="/style.css">
+</head>
+<body>
+<div class="gridbg"></div>
+<div class="shell">
+  <aside class="sidebar">
+    <a class="wordmark" href="/index.html">
+      <div class="glyph">+</div>
+      <div class="name">POTEN<span>STUDIO</span></div>
+    </a>
+    <div class="microlabel">Content Factory</div>
+    <a class="nav-item" href="/index.html"><span class="ico"></span>자료함</a>
+    <a class="nav-item" href="/queue.html"><span class="ico"></span>대기열</a>
+    <a class="nav-item" href="/brands.html"><span class="ico"></span>브랜드</a>
+    <a class="nav-item active" href="/settings.html"><span class="ico"></span>설정</a>
+    <div class="foot"><span class="dot-live"></span>모든 시스템 정상</div>
+  </aside>
+
+  <main class="content">
+    <div class="pagehead reveal">
+      <div class="microlabel">Settings</div>
+      <h1>설정</h1>
+      <p>발행 계정과 자동화 동작을 여기서 관리합니다. 저장 즉시 적용됩니다.</p>
+    </div>
+
+    <form id="f" class="panel reveal d1" style="max-width:640px">
+      <div class="microlabel" style="margin-bottom:4px">Zernio (Instagram 발행)</div>
+      <label for="ZERNIO_API_KEY">API 키 <span style="font-weight:500;color:var(--faint)">— sk_ 로 시작</span></label>
+      <input type="text" id="ZERNIO_API_KEY" placeholder="sk_..." autocomplete="off">
+      <div id="accounts" class="muted" style="margin-top:10px;font-size:13px">연결된 계정 불러오는 중…</div>
+
+      <div class="microlabel" style="margin:26px 0 4px">자동화</div>
+      <label for="DAILY_HOUR">매일 자동 생성 시각 <span style="font-weight:500;color:var(--faint)">0–23시</span></label>
+      <input type="text" id="DAILY_HOUR" placeholder="9">
+      <label for="REGEN_SCOPE">Discord 재생성 범위</label>
+      <select id="REGEN_SCOPE">
+        <option value="backgrounds">디자인만 (카피 유지)</option>
+        <option value="full">전체 (카피부터 다시)</option>
+      </select>
+      <label for="REGEN_MAX">재생성 최대 횟수</label>
+      <input type="text" id="REGEN_MAX" placeholder="3">
+
+      <div class="microlabel" style="margin:26px 0 4px">이미지 생성</div>
+      <label for="HF_MODEL">Higgsfield 모델</label>
+      <input type="text" id="HF_MODEL" placeholder="nano_banana_2_lite">
+
+      <div style="margin-top:24px"><button type="submit" id="save">저장 <span class="arr">→</span></button></div>
+      <div class="error" id="err"></div>
+      <div class="muted" id="ok" style="margin-top:10px"></div>
+    </form>
+  </main>
+</div>
+<script>
+const $ = id => document.getElementById(id);
+const KEYS = ['ZERNIO_API_KEY', 'DAILY_HOUR', 'REGEN_SCOPE', 'REGEN_MAX', 'HF_MODEL'];
+
+async function api(url, opts) {
+  const res = await fetch(url, opts);
+  if (res.status === 401) { location.href = '/login.html'; throw new Error('unauthorized'); }
+  return res;
+}
+
+async function load() {
+  const s = await (await api('/api/settings')).json();
+  for (const k of KEYS) $(k).value = s[k] || '';
+  loadAccounts();
+}
+
+async function loadAccounts() {
+  const box = $('accounts');
+  try {
+    const res = await api('/api/zernio/accounts');
+    if (!res.ok) { box.textContent = '계정 조회 실패 — API 키를 확인하세요'; return; }
+    const list = await res.json();
+    if (!list.length) { box.textContent = '연결된 계정 없음 — Zernio 대시보드에서 Instagram을 연결하세요'; return; }
+    box.innerHTML = '';
+    for (const a of list) {
+      const row = document.createElement('div');
+      row.style.cssText = 'display:flex;gap:10px;align-items:center;margin-top:6px';
+      row.innerHTML = `<span class="badge published">${a.platform}</span><strong>@${a.username}</strong><code style="color:var(--faint);font-size:12px">${a.id}</code>`;
+      box.appendChild(row);
+    }
+    const hint = document.createElement('div');
+    hint.className = 'muted';
+    hint.style.cssText = 'margin-top:8px;font-size:12px';
+    hint.textContent = '계정 ID를 브랜드 설정의 "Zernio IG 계정 ID"에 붙여넣으세요.';
+    box.appendChild(hint);
+  } catch { box.textContent = '계정 조회 실패'; }
+}
+
+$('f').onsubmit = async (e) => {
+  e.preventDefault();
+  $('err').textContent = ''; $('ok').textContent = '';
+  const body = {};
+  for (const k of KEYS) body[k] = $(k).value.trim();
+  const res = await api('/api/settings', {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) { $('err').textContent = '저장 실패'; return; }
+  $('ok').textContent = '저장되었습니다 ✓';
+  load();
+};
+
+load();
+</script>
+</body>
+</html>

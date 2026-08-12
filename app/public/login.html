@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>로그인 — POTENSTUDIO</title>
+<link rel="stylesheet" href="/style.css">
+</head>
+<body>
+<div class="gridbg"></div>
+<div class="login-split">
+  <div class="login-brand">
+    <div class="wordmark reveal">
+      <div class="glyph">+</div>
+      <div class="name">POTEN<span>STUDIO</span></div>
+    </div>
+    <div class="microlabel reveal d1">Content Factory</div>
+
+    <h2 class="reveal d2">아이디어부터 게시까지,<br><em>한 화면</em>에서 움직입니다.</h2>
+    <p class="sub reveal d2">주제를 넣으면 AI가 카드뉴스를 만들고, 승인하면 인스타그램에 올라갑니다.</p>
+
+    <div class="pipeline reveal d3">
+      <span class="step"><span class="d"></span>주제·자료</span>
+      <span class="arrow">→</span>
+      <span class="step"><span class="d"></span>AI 카피</span>
+      <span class="arrow">→</span>
+      <span class="step"><span class="d"></span>디자인</span>
+      <span class="arrow">→</span>
+      <span class="step"><span class="d"></span>승인</span>
+      <span class="arrow">→</span>
+      <span class="step"><span class="d"></span>게시</span>
+    </div>
+
+    <div class="foot">
+      <span>Instagram Automation</span>
+      <span>Seoul · KST</span>
+      <span style="display:flex;align-items:center;gap:7px"><span class="dot-live"></span>모든 시스템 정상</span>
+    </div>
+  </div>
+
+  <div class="login-form">
+    <div class="inner">
+      <div class="microlabel reveal">Sign in</div>
+      <h1 class="reveal d1">다시 오셨네요</h1>
+      <p class="desc reveal d1">포텐스튜디오 워크스페이스에 로그인하고 이어서 진행하세요.</p>
+      <form id="f" class="reveal d2">
+        <label for="pw">비밀번호</label>
+        <input type="password" id="pw" autofocus autocomplete="current-password" placeholder="········">
+        <button type="submit">로그인 <span class="arr">→</span></button>
+        <div class="error" id="err"></div>
+      </form>
+      <div class="copyright">© 2026 Potenlab. All rights reserved.</div>
+    </div>
+  </div>
+</div>
+<script>
+document.getElementById('f').onsubmit = async (e) => {
+  e.preventDefault();
+  const res = await fetch('/api/login', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ password: document.getElementById('pw').value }),
+  });
+  if (res.ok) location.href = '/index.html';
+  else document.getElementById('err').textContent = '비밀번호가 틀렸습니다';
+};
+</script>
+</body>
+</html>

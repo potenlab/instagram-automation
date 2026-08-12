@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>대기열 — POTENSTUDIO</title>
+<link rel="stylesheet" href="/style.css">
+</head>
+<body>
+<div class="gridbg"></div>
+<div class="shell">
+  <aside class="sidebar">
+    <a class="wordmark" href="/index.html">
+      <div class="glyph">+</div>
+      <div class="name">POTEN<span>STUDIO</span></div>
+    </a>
+    <div class="microlabel">Content Factory</div>
+    <a class="nav-item" href="/index.html"><span class="ico"></span>자료함</a>
+    <a class="nav-item active" href="/queue.html"><span class="ico"></span>대기열</a>
+    <a class="nav-item" href="/brands.html"><span class="ico"></span>브랜드</a>
+    <a class="nav-item" href="/settings.html"><span class="ico"></span>설정</a>
+    <div class="foot"><span class="dot-live"></span>모든 시스템 정상</div>
+  </aside>
+
+  <main class="content">
+    <div class="pagehead reveal">
+      <div class="microlabel">Queue</div>
+      <h1>대기열</h1>
+      <p>생성 중인 작업과 지난 결과를 확인하세요. 10초마다 자동 갱신됩니다.</p>
+    </div>
+    <div id="list" class="reveal d1"><p class="muted">불러오는 중…</p></div>
+  </main>
+</div>
+<script>
+const STATUS = {
+  stock: '자료함', queued: '대기중', generating: '생성중', preview: '미리보기',
+  approved: '승인됨', published: '게시됨', failed: '실패',
+};
+const MODE = { topic: '주제', materials: '자료', rss: 'RSS' };
+
+async function api(url, opts) {
+  const res = await fetch(url, opts);
+  if (res.status === 401) { location.href = '/login.html'; throw new Error('unauthorized'); }
+  return res;
+}
+
+function el(tag, cls, text) {
+  const e = document.createElement(tag);
+  if (cls) e.className = cls;
+  if (text != null) e.textContent = text;
+  return e;
+}
+
+async function load() {
+  const jobs = await (await api('/api/jobs?limit=50')).json();
+  const list = document.getElementById('list');
+  list.innerHTML = '';
+  if (!jobs.length) { list.appendChild(el('p', 'muted', '아직 작업이 없습니다. 새 포스트를 만들어보세요.')); return; }
+
+  for (const j of jobs) {
+    const card = el('div', 'panel hoverable job');
+    const head = el('div', 'head');
+    head.appendChild(el('span', 'num', '#' + j.id));
+    head.appendChild(el('span', 'badge ' + j.status, STATUS[j.status] || j.status));
+    head.appendChild(el('span', 'meta', j.brand_name || '(삭제된 브랜드)'));
+    head.appendChild(el('span', 'meta', MODE[j.mode] || j.mode));
+    head.appendChild(el('span', 'meta', (j.created_at || '').slice(0, 16).replace('T', ' ')));
+    card.appendChild(head);
+
+    const t = (j.topic || '').replace(/\s+/g, ' ');
+    card.appendChild(el('div', 'topic', t.length > 120 ? t.slice(0, 120) + '…' : t));
+
+    if (j.status === 'failed' || j.status === 'stock') {
+      if (j.error) card.appendChild(el('div', 'error', j.error.slice(-300)));
+      const actions = el('div');
+      actions.style.cssText = 'margin-top:14px;display:flex;gap:8px';
+      if (j.status === 'failed') {
+        const btn = el('button', 'secondary', '재시도');
+        btn.onclick = async () => {
+          btn.disabled = true;
+          await api('/api/jobs/' + j.id + '/retry', { method: 'POST' });
+          load();
+        };
+        actions.appendChild(btn);
+      }
+      const del = el('button', 'danger', '삭제');
+      del.onclick = async () => {
+        if (!confirm('#' + j.id + ' 을(를) 삭제할까요?')) return;
+        del.disabled = true;
+        await api('/api/jobs/' + j.id, { method: 'DELETE' });
+        load();
+      };
+      actions.appendChild(del);
+      card.appendChild(actions);
+    }
+
+    if (j.slides && j.slides.length) {
+      const thumbs = el('div', 'thumbs');
+      for (const src of j.slides) {
+        const img = el('img');
+        img.src = src;
+        img.loading = 'lazy';
+        thumbs.appendChild(img);
+      }
+      card.appendChild(thumbs);
+    }
+    list.appendChild(card);
+  }
+}
+
+load();
+setInterval(load, 10000);
+</script>
+</body>
+</html>

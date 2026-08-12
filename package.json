@@ -1,0 +1,19 @@
+{
+  "name": "instagram-automation",
+  "version": "1.0.0",
+  "description": "Korean tech card-news pipeline: claude -p copy → Higgsfield backgrounds → Playwright PNG render",
+  "private": true,
+  "scripts": {
+    "render": "node scripts/render.js",
+    "generate": "scripts/generate.sh",
+    "approve": "node scripts/approve-bot.js",
+    "ui": "node app/server.js"
+  },
+  "dependencies": {
+    "better-sqlite3": "^13.0.3",
+    "discord.js": "^14.27.0",
+    "express": "^5.2.1",
+    "multer": "^2.2.0",
+    "playwright": "^1.62.1"
+  }
+}
