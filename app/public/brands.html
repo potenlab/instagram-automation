@@ -44,8 +44,8 @@
       <input type="text" id="handle">
       <label for="discord_channel_id">Discord 채널 ID</label>
       <input type="text" id="discord_channel_id">
-      <label for="ig_account_id">Zernio IG 계정 ID</label>
-      <input type="text" id="ig_account_id">
+      <label for="ig_account_id">Instagram 계정 <span style="font-weight:500;color:var(--faint)">Zernio에 연결된 계정 중 선택</span></label>
+      <select id="ig_account_id"><option value="">— 미설정 —</option></select>
       <label for="rss_feeds">RSS 피드 <span style="font-weight:500;color:var(--faint)">쉼표로 구분</span></label>
       <input type="text" id="rss_feeds">
       <label>기본 템플릿 <span style="font-weight:500;color:var(--faint)">이 계정의 카드뉴스 디자인 — 자료함에서 게시물별로 바꿀 수 있어요</span></label>
@@ -66,6 +66,27 @@
 const $ = id => document.getElementById(id);
 const FIELDS = ['name', 'handle', 'discord_channel_id', 'ig_account_id', 'rss_feeds', 'template', 'prompt_rules'];
 let brands = [];
+
+// --- Instagram account select (dari Zernio) ---
+fetch('/api/zernio/accounts').then(r => r.ok ? r.json() : []).then(accounts => {
+  for (const a of accounts) {
+    const o = document.createElement('option');
+    o.value = a.id;
+    o.textContent = `${a.username || a.id} (${a.platform || 'instagram'})`;
+    $('ig_account_id').appendChild(o);
+  }
+}).catch(() => {});
+
+function syncIgSelect(value) {
+  const sel = $('ig_account_id');
+  // ID tersimpan tapi tidak ada di daftar (API mati / akun dilepas) → tetap tampilkan raw ID
+  if (value && ![...sel.options].some(o => o.value === value)) {
+    const o = document.createElement('option');
+    o.value = value; o.textContent = value + ' (목록에 없음)';
+    sel.appendChild(o);
+  }
+  sel.value = value || '';
+}
 
 // --- template picker (pill + live thumbnail, sama seperti 자료함) ---
 let templates = [];
@@ -174,6 +195,7 @@ function openForm(b) {
   $('ftitle').textContent = b ? '브랜드 편집 — ' + b.name : '브랜드 추가';
   $('bid').value = b ? b.id : '';
   for (const f of FIELDS) $(f).value = b ? (b[f] || '') : (f === 'template' ? 'slide.html' : '');
+  syncIgSelect(b ? b.ig_account_id : '');
   renderTplPills();
   $('err').textContent = '';
   $('f').scrollIntoView({ behavior: 'smooth', block: 'nearest' });

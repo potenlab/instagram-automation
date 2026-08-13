@@ -298,4 +298,5 @@ const PORT = process.env.PORT || 3002;
 app.listen(PORT, () => {
   console.log(`Card News Studio: http://localhost:${PORT}`);
   worker.start();
+  require('./intake').start();
 });

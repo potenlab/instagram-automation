@@ -75,24 +75,15 @@ async function runJob(job) {
     return setStatus(job.id, 'failed', tail || `generate.sh exit ${code}`);
   }
 
-  // 4. approve-bot (detached, tidak di-await)
-  const approveLog = fs.openSync(path.join(dir, 'approve.log'), 'a');
-  const bot = spawn('node', [path.join(ROOT, 'scripts', 'approve-bot.js'), 'out/' + postDir], {
-    cwd: ROOT,
-    detached: true,
-    stdio: ['ignore', approveLog, approveLog],
-    env: {
-      ...process.env,
-      DISCORD_CHANNEL_ID: brand.discord_channel_id,
-      ZERNIO_IG_ACCOUNT_ID: brand.ig_account_id || '',
-    },
-  });
-  bot.unref();
-  fs.closeSync(approveLog);
+  // 4. preview + approval via bot Discord tunggal (satu proses, channel per brand)
   setStatus(job.id, 'preview');
+  require('./intake').preview(job.id).catch(e => {
+    console.error('worker preview:', e.message);
+    fs.appendFileSync(path.join(dir, 'approve.log'), 'preview gagal: ' + e.message + '\n');
+  });
 }
 
-// preview/approved → cek file marker dari approve-bot / publish.js
+// preview/approved → cek file marker dari intake bot / publish.js
 function checkMarkers() {
   const rows = db.prepare(`SELECT id, post_dir, status FROM jobs WHERE status IN ('preview','approved') AND post_dir IS NOT NULL`).all();
   for (const j of rows) {

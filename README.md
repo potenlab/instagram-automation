@@ -89,6 +89,6 @@ Pick the default per brand in 브랜드, or per post in 자료함 (live thumbnai
 
 - **Job failed** → open `out/<post-id>/pipeline.log`; fix, then 재시도 in 대기열 (idempotent — completed steps are skipped).
 - **`content.json` invalid** → the claude CLI output was malformed; retry usually fixes it.
-- **Discord buttons dead** → the approve-bot process died (24h timeout or reboot); rerun `node scripts/approve-bot.js out/<post-id>`.
+- **Discord buttons dead** → the single intake bot lives inside `npm run ui` (24h button timeout or server restart kills the listener); restart the server, or rerun `node scripts/approve-bot.js out/<post-id>` as a standalone fallback.
 - **Publish skipped on approve** → `ZERNIO_API_KEY` missing or the brand has no Instagram account ID.
 - **Nothing generated this morning** → server wasn't running at `DAILY_HOUR`; it fires as soon as the process is back up (once per day).
