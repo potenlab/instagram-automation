@@ -160,8 +160,11 @@ app.get('/tpl-preview/:file', (req, res) => {
 app.get('/tpl-preview/:family/:file', (req, res) => {
   const p = path.resolve(TPL_ROOT, req.params.family, req.params.file);
   if (!p.startsWith(TPL_ROOT + path.sep) || !p.endsWith('.html') || !fs.existsSync(p)) return res.status(404).end();
+  // layout dirender via file:// saat produksi, jadi link-nya relatif — di preview
+  // (URL) style.css dan ../assets/* harus diarahkan ke /tpl-src
   const html = fill(fs.readFileSync(p, 'utf8'), TPL_SAMPLE)
-    .replace('href="style.css"', `href="/tpl-src/${req.params.family}/style.css"`);
+    .replace('href="style.css"', `href="/tpl-src/${req.params.family}/style.css"`)
+    .replace(/["']\.\.\/assets\//g, '"/tpl-src/assets/');
   res.type('html').send(html);
 });
 app.use('/tpl-src', express.static(TPL_ROOT));
