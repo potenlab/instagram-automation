@@ -78,13 +78,15 @@ function slideFiles(dir) {
 async function publishJob(jobId, dir, brand, channel, press) {
   fs.writeFileSync(path.join(dir, 'approved'), now() + '\n');
   setStatus(jobId, 'approved');
-  if (!process.env.ZERNIO_API_KEY || !brand.ig_account_id) {
+  // key per brand (akun IG bisa beda workspace Zernio); kosong = 기본 키 di 설정
+  const zernioKey = String(brand.zernio_api_key || '').trim() || process.env.ZERNIO_API_KEY;
+  if (!zernioKey || !brand.ig_account_id) {
     return press.update({ content: `✅ **#${jobId}** — ${press.user.username}님이 승인했습니다 (Zernio/계정 미설정 — 게시 건너뜀)`, components: [] });
   }
   await press.update({ content: `⏳ **#${jobId}** — 승인됨, 인스타그램에 게시 중…`, components: [] });
   try {
     await run('node', [path.join(ROOT, 'scripts', 'publish.js'), dir],
-      { env: { ...process.env, ZERNIO_IG_ACCOUNT_ID: brand.ig_account_id } });
+      { env: { ...process.env, ZERNIO_API_KEY: zernioKey, ZERNIO_IG_ACCOUNT_ID: brand.ig_account_id } });
     setStatus(jobId, 'published');
     await channel.send(`🚀 **#${jobId}** — 인스타그램에 게시했습니다!`);
   } catch (e) {

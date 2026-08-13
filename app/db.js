@@ -42,6 +42,10 @@ CREATE TABLE IF NOT EXISTS materials(
 // migrasi ringan: jobs.template (pilihan template per job dari web UI)
 try { db.exec('ALTER TABLE jobs ADD COLUMN template TEXT'); } catch {}
 
+// migrasi ringan: brands.zernio_api_key — tiap akun IG bisa ada di workspace Zernio
+// yang berbeda, jadi key-nya per brand. Kosong = pakai ZERNIO_API_KEY dari 설정.
+try { db.exec('ALTER TABLE brands ADD COLUMN zernio_api_key TEXT'); } catch {}
+
 // seed sekali saja kalau brands kosong
 if (db.prepare('SELECT COUNT(*) AS c FROM brands').get().c === 0) {
   let channel = '';

@@ -44,8 +44,11 @@
       <input type="text" id="handle">
       <label for="discord_channel_id">Discord 채널 ID</label>
       <input type="text" id="discord_channel_id">
-      <label for="ig_account_id">Instagram 계정 <span style="font-weight:500;color:var(--faint)">Zernio에 연결된 계정 중 선택</span></label>
+      <label for="zernio_api_key">Zernio API 키 <span style="font-weight:500;color:var(--faint)">이 계정 전용 — 비우면 설정의 기본 키를 씁니다</span></label>
+      <input type="text" id="zernio_api_key" placeholder="sk_..." autocomplete="off">
+      <label for="ig_account_id">Instagram 계정 <span style="font-weight:500;color:var(--faint)">위 키에 연결된 계정 중 선택</span></label>
       <select id="ig_account_id"><option value="">— 미설정 —</option></select>
+      <div id="ighint" style="font-size:12px;color:var(--faint);margin-top:6px"></div>
       <label for="rss_feeds">RSS 피드 <span style="font-weight:500;color:var(--faint)">쉼표로 구분</span></label>
       <input type="text" id="rss_feeds">
       <label>기본 템플릿 <span style="font-weight:500;color:var(--faint)">이 계정의 카드뉴스 디자인 — 자료함에서 게시물별로 바꿀 수 있어요</span></label>
@@ -64,18 +67,45 @@
 </div>
 <script>
 const $ = id => document.getElementById(id);
-const FIELDS = ['name', 'handle', 'discord_channel_id', 'ig_account_id', 'rss_feeds', 'template', 'prompt_rules'];
+const FIELDS = ['name', 'handle', 'discord_channel_id', 'ig_account_id', 'rss_feeds', 'template', 'prompt_rules', 'zernio_api_key'];
 let brands = [];
 
-// --- Instagram account select (dari Zernio) ---
-fetch('/api/zernio/accounts').then(r => r.ok ? r.json() : []).then(accounts => {
+// --- Instagram account select (dari Zernio, per brand) ---
+// Key tiap brand bisa beda workspace, jadi daftar akun ikut key yang aktif di form:
+// key yang sedang diketik → key tersimpan brand ini → 기본 키 di 설정.
+let igReq = 0;
+
+async function loadAccounts(preferred) {
+  const sel = $('ig_account_id');
+  const want = preferred != null ? preferred : sel.value;
+  const key = $('zernio_api_key').value.trim();
+  const bid = $('bid').value;
+  const q = key && !key.includes('…') ? '?key=' + encodeURIComponent(key)
+    : bid ? '?brand_id=' + encodeURIComponent(bid) : '';
+
+  const seq = ++igReq;
+  $('ighint').textContent = '계정 불러오는 중…';
+  let accounts = [], err = '';
+  try {
+    const res = await api('/api/zernio/accounts' + q);
+    if (res.ok) accounts = await res.json();
+    else err = (await res.json().catch(() => ({}))).error || '계정을 불러오지 못했습니다';
+  } catch { err = '계정을 불러오지 못했습니다'; }
+  if (seq !== igReq) return; // respons lama menyusul — abaikan
+
+  sel.innerHTML = '';
+  const none = document.createElement('option');
+  none.value = ''; none.textContent = '— 미설정 —';
+  sel.appendChild(none);
   for (const a of accounts) {
     const o = document.createElement('option');
     o.value = a.id;
     o.textContent = `${a.username || a.id} (${a.platform || 'instagram'})`;
-    $('ig_account_id').appendChild(o);
+    sel.appendChild(o);
   }
-}).catch(() => {});
+  syncIgSelect(want);
+  $('ighint').textContent = err || (accounts.length ? `${accounts.length}개 계정 연결됨` : '연결된 계정이 없습니다');
+}
 
 function syncIgSelect(value) {
   const sel = $('ig_account_id');
@@ -171,6 +201,7 @@ async function load() {
     const rows = el('div', 'rows');
     rows.appendChild(row('Discord', b.discord_channel_id ? '연결됨' : '미설정', !!b.discord_channel_id));
     rows.appendChild(row('Instagram', b.ig_account_id ? '연결됨' : '미설정', !!b.ig_account_id));
+    rows.appendChild(row('Zernio 키', b.zernio_api_key ? '전용' : '기본', !!b.zernio_api_key));
     rows.appendChild(row('RSS', b.rss_feeds ? '활성' : '—', !!b.rss_feeds));
     rows.appendChild(row('템플릿', tplName(b.template)));
     card.appendChild(rows);
@@ -195,7 +226,7 @@ function openForm(b) {
   $('ftitle').textContent = b ? '브랜드 편집 — ' + b.name : '브랜드 추가';
   $('bid').value = b ? b.id : '';
   for (const f of FIELDS) $(f).value = b ? (b[f] || '') : (f === 'template' ? 'slide.html' : '');
-  syncIgSelect(b ? b.ig_account_id : '');
+  loadAccounts(b ? b.ig_account_id || '' : '');
   renderTplPills();
   $('err').textContent = '';
   $('f').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
@@ -204,6 +235,7 @@ function openForm(b) {
 
 $('new').onclick = () => openForm(null);
 $('cancel').onclick = () => { $('f').style.display = 'none'; };
+$('zernio_api_key').onchange = () => loadAccounts('');
 
 $('f').onsubmit = async (e) => {
   e.preventDefault();

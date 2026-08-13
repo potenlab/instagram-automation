@@ -31,9 +31,10 @@
 
     <form id="f" class="panel reveal d1" style="max-width:640px">
       <div class="microlabel" style="margin-bottom:4px">Zernio (Instagram 발행)</div>
-      <label for="ZERNIO_API_KEY">API 키 <span style="font-weight:500;color:var(--faint)">— sk_ 로 시작</span></label>
+      <label for="ZERNIO_API_KEY">기본 API 키 <span style="font-weight:500;color:var(--faint)">— sk_ 로 시작 · 브랜드에 전용 키가 없을 때만 사용</span></label>
       <input type="text" id="ZERNIO_API_KEY" placeholder="sk_..." autocomplete="off">
       <div id="accounts" class="muted" style="margin-top:10px;font-size:13px">연결된 계정 불러오는 중…</div>
+      <p class="muted" style="margin-top:8px;font-size:12px">계정마다 Zernio 워크스페이스가 다르면 <a href="/brands.html">브랜드</a> 화면에서 브랜드별 키를 넣으세요.</p>
 
       <div class="microlabel" style="margin:26px 0 4px">자동화</div>
       <label for="DAILY_HOUR">매일 자동 생성 시각 <span style="font-weight:500;color:var(--faint)">0–23시</span></label>

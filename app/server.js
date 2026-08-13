@@ -51,29 +51,40 @@ app.post('/api/login', express.json(), (req, res) => {
 });
 
 // --- brands CRUD ---
-const BRAND_FIELDS = ['name', 'handle', 'discord_channel_id', 'ig_account_id', 'rss_feeds', 'template', 'prompt_rules'];
+const BRAND_FIELDS = ['name', 'handle', 'discord_channel_id', 'ig_account_id', 'rss_feeds', 'template', 'prompt_rules', 'zernio_api_key'];
+const TEMPLATE_IDX = BRAND_FIELDS.indexOf('template');
 const brandBody = b => BRAND_FIELDS.map(f => String(b[f] ?? ''));
 
+// key tidak pernah dikirim utuh ke browser — sama seperti /api/settings
+const maskKey = v => (v ? v.slice(0, 3) + '…' + v.slice(-4) : '');
+const brandOut = b => (b ? { ...b, zernio_api_key: maskKey(b.zernio_api_key || '') } : b);
+const isMasked = v => String(v ?? '').includes('…');
+
 app.get('/api/brands', (req, res) => {
-  res.json(db.prepare('SELECT * FROM brands ORDER BY id').all());
+  res.json(db.prepare('SELECT * FROM brands ORDER BY id').all().map(brandOut));
 });
 
 app.post('/api/brands', express.json(), (req, res) => {
   if (!req.body?.name) return res.status(400).json({ error: '이름은 필수입니다' });
-  const vals = brandBody(req.body);
-  if (!vals[5]) vals[5] = 'slide.html';
-  const r = db.prepare(`INSERT INTO brands(${BRAND_FIELDS.join(',')}, created_at) VALUES (?,?,?,?,?,?,?,?)`)
+  const body = { ...req.body };
+  if (isMasked(body.zernio_api_key)) body.zernio_api_key = '';
+  const vals = brandBody(body);
+  if (!vals[TEMPLATE_IDX]) vals[TEMPLATE_IDX] = 'slide.html';
+  const r = db.prepare(`INSERT INTO brands(${BRAND_FIELDS.join(',')}, created_at)
+      VALUES (${BRAND_FIELDS.map(() => '?').join(',')}, ?)`)
     .run(...vals, new Date().toISOString());
-  res.json(db.prepare('SELECT * FROM brands WHERE id=?').get(r.lastInsertRowid));
+  res.json(brandOut(db.prepare('SELECT * FROM brands WHERE id=?').get(r.lastInsertRowid)));
 });
 
 app.put('/api/brands/:id', express.json(), (req, res) => {
   const brand = db.prepare('SELECT * FROM brands WHERE id=?').get(req.params.id);
   if (!brand) return res.status(404).json({ error: '브랜드가 없습니다' });
   const merged = { ...brand, ...req.body };
+  // nilai masked dikirim balik dari form = key tidak diubah
+  if (isMasked(req.body?.zernio_api_key)) merged.zernio_api_key = brand.zernio_api_key || '';
   db.prepare(`UPDATE brands SET ${BRAND_FIELDS.map(f => f + '=?').join(',')} WHERE id=?`)
     .run(...brandBody(merged), brand.id);
-  res.json(db.prepare('SELECT * FROM brands WHERE id=?').get(brand.id));
+  res.json(brandOut(db.prepare('SELECT * FROM brands WHERE id=?').get(brand.id)));
 });
 
 app.delete('/api/brands/:id', (req, res) => {
@@ -249,10 +260,17 @@ app.put('/api/settings', express.json(), (req, res) => {
   res.json({ ok: true });
 });
 
-// akun Zernio yang terhubung — buat isi ig_account_id di brand
+// akun Zernio yang terhubung — buat isi ig_account_id di brand.
+// key: ?key=sk_… (yang sedang diketik di form) → ?brand_id=N (key tersimpan brand itu) → 기본 키 di 설정
 app.get('/api/zernio/accounts', async (req, res) => {
-  const key = process.env.ZERNIO_API_KEY;
-  if (!key) return res.status(400).json({ error: 'ZERNIO_API_KEY가 설정되지 않았습니다' });
+  let key = String(req.query.key || '').trim();
+  if (isMasked(key)) key = '';
+  if (!key && req.query.brand_id) {
+    const b = db.prepare('SELECT zernio_api_key FROM brands WHERE id=?').get(req.query.brand_id);
+    key = String(b?.zernio_api_key || '').trim();
+  }
+  if (!key) key = process.env.ZERNIO_API_KEY || '';
+  if (!key) return res.status(400).json({ error: 'Zernio API 키가 없습니다 — 브랜드에 입력하거나 설정에서 기본 키를 넣어주세요' });
   try {
     const r = await fetch('https://zernio.com/api/v1/accounts', { headers: { Authorization: `Bearer ${key}` } });
     const body = await r.json();
