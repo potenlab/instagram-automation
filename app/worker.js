@@ -30,10 +30,21 @@ function slug(topic) {
   return s || 'post';
 }
 
-function spawnLogged(cmd, args, opts, logFile) {
+function spawnLogged(cmd, args, opts, logFile, onLine) {
   return new Promise(resolve => {
     const log = fs.createWriteStream(logFile, { flags: 'a' });
     const child = spawn(cmd, args, opts);
+    if (onLine) {
+      let buf = '';
+      const watch = chunk => {
+        buf += chunk.toString();
+        const lines = buf.split('\n');
+        buf = lines.pop();
+        for (const l of lines) { try { onLine(l); } catch (e) { console.error('worker onLine:', e.message); } }
+      };
+      child.stdout.on('data', watch);
+      child.stderr.on('data', watch);
+    }
     child.stdout.pipe(log);
     child.stderr.pipe(log);
     child.on('error', err => { log.write('spawn error: ' + err.message + '\n'); resolve(1); });
@@ -72,11 +83,24 @@ async function runJob(job) {
     topic += '자료 이미지가 슬라이드 배경으로 적합하면 해당 slide에 "background_material": "<filename>" 필드를 넣어라. Read 도구로 자료 이미지를 먼저 봐라.';
   }
 
-  // 3. generate.sh
+  // 3. generate.sh — tiap tahap dikabari ke channel (sekali per tahap, maks 3 pesan)
+  const sent = new Set();
+  const stage = (key, text) => {
+    if (sent.has(key)) return;
+    sent.add(key);
+    Promise.resolve()
+      .then(() => require('./intake').notifyStage(job.id, text))
+      .catch(e => console.error('worker notifyStage:', e.message));
+  };
   const code = await spawnLogged(
     path.join(ROOT, 'scripts', 'generate.sh'), [postDir, topic],
     { cwd: ROOT, env: { ...process.env, HF_MODEL: process.env.HF_MODEL || '', TEMPLATE: job.template || brand.template || 'slide.html', BRAND_NAME: brand.name || '', BRAND_HANDLE: brand.handle || '' } },
     path.join(dir, 'pipeline.log'),
+    line => {
+      if (line.startsWith('== claude -p')) stage('copy', '카피 쓰는 중… (보통 1–3분)');
+      else if (line.startsWith('== background') && !line.includes('skip')) stage('bg', '이미지 만드는 중…');
+      else if (line.startsWith('== render')) stage('render', '렌더링 중… 곧 미리보기가 올라와요');
+    },
   );
   if (code !== 0) {
     let tail = '';

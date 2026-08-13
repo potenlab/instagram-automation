@@ -131,6 +131,19 @@ async function approvalLoop({ channel, jobId, brand, dir, title, regenLabel, reg
   }
 }
 
+// ---- dipanggil worker tiap ganti tahap ----
+// Antara "접수" dan preview dulu tidak ada tanda apa pun, jadi proses lambat dan
+// proses macet terlihat sama persis dari Discord.
+async function notifyStage(jobId, stage) {
+  if (!client || !client.isReady()) return;
+  const job = db.prepare('SELECT * FROM jobs WHERE id=?').get(jobId);
+  if (!job) return;
+  const brand = db.prepare('SELECT * FROM brands WHERE id=?').get(job.brand_id);
+  if (!brand || !brand.discord_channel_id) return;
+  const channel = await client.channels.fetch(brand.discord_channel_id);
+  await channel.send(`⏳ **#${jobId} ${brand.name}** — ${stage}`.slice(0, 2000));
+}
+
 // ---- dipanggil worker saat job gagal ----
 // Tanpa ini, dari sisi Discord "gagal" dan "masih diproses" sama-sama sunyi.
 async function notifyFailure(jobId, reason) {
@@ -260,4 +273,4 @@ function start() {
   client.login(process.env.DISCORD_BOT_TOKEN).catch(e => console.error('intake login gagal:', e.message));
 }
 
-module.exports = { start, preview, notifyFailure };
+module.exports = { start, preview, notifyFailure, notifyStage };
