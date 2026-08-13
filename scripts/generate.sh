@@ -17,10 +17,27 @@ if [ ! -f "$DIR/content.json" ]; then
   echo "$TOPIC" > "$DIR/topic.txt"   # disimpan supaya approve-bot bisa regen full
   echo "== claude -p: nulis konten =="
   LAYOUT_DOC="$ROOT/prompts/layouts-${TEMPLATE:-}.md"   # family template → layout instructions ikut prompt
+  # output claude ditampung dulu: kalau gagal (auth habis, rate limit, dsb) pesannya
+  # harus masuk log ini — bukan terkubur di content.json seperti sebelumnya
+  RAW="$DIR/claude-raw.txt"
+  set +e
   { cat "$ROOT/prompts/card-news.md"; [ -f "$LAYOUT_DOC" ] && cat "$LAYOUT_DOC"; printf '\n## 주제\n\n%s\n' "$TOPIC"; } \
-    | claude -p --allowedTools WebFetch Read \
-    | node -e 'const s=require("fs").readFileSync(0,"utf8");const a=s.indexOf("{"),b=s.lastIndexOf("}");process.stdout.write(a<0?s:s.slice(a,b+1))' > "$DIR/content.json"
-  jq . "$DIR/content.json" > /dev/null || { echo "output bukan JSON valid — cek $DIR/content.json"; exit 1; }
+    | claude -p --allowedTools WebFetch Read > "$RAW" 2> "$DIR/claude-err.txt"
+  RC=$?
+  set -e
+  if [ "$RC" -ne 0 ]; then
+    echo "claude -p gagal (exit $RC):"
+    head -c 600 "$DIR/claude-err.txt"; echo
+    head -c 600 "$RAW"; echo
+    exit 1
+  fi
+  node -e 'const s=require("fs").readFileSync(0,"utf8");const a=s.indexOf("{"),b=s.lastIndexOf("}");process.stdout.write(a<0?s:s.slice(a,b+1))' \
+    < "$RAW" > "$DIR/content.json"
+  if ! jq . "$DIR/content.json" > /dev/null 2>&1; then
+    echo "output claude bukan JSON valid — 600 karakter pertama:"
+    head -c 600 "$RAW"; echo
+    exit 1
+  fi
   if [ -n "${TEMPLATE:-}" ] && [ "$TEMPLATE" != "slide.html" ]; then
     jq --arg t "$TEMPLATE" '.template=$t' "$DIR/content.json" > "$DIR/content.json.tmp" && mv "$DIR/content.json.tmp" "$DIR/content.json"
   fi

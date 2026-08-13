@@ -15,6 +15,15 @@ function setStatus(id, status, error = null) {
   db.prepare('UPDATE jobs SET status=?, error=?, updated_at=? WHERE id=?').run(status, error, now(), id);
 }
 
+// gagal = catat di DB + kabari channel brand (kalau cuma di DB, Discord diam dan
+// pengirim brief tidak tahu bedanya dengan "masih diproses")
+function fail(id, reason) {
+  setStatus(id, 'failed', reason);
+  Promise.resolve()
+    .then(() => require('./intake').notifyFailure(id, reason))
+    .catch(e => console.error('worker notifyFailure:', e.message));
+}
+
 function slug(topic) {
   const s = String(topic || '').split(/\s+/).slice(0, 4).join(' ')
     .toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
@@ -34,9 +43,9 @@ function spawnLogged(cmd, args, opts, logFile) {
 
 async function runJob(job) {
   const brand = db.prepare('SELECT * FROM brands WHERE id=?').get(job.brand_id);
-  if (!brand) return setStatus(job.id, 'failed', '브랜드를 찾을 수 없습니다. 브랜드 설정을 확인하세요.');
+  if (!brand) return fail(job.id, '브랜드를 찾을 수 없습니다. 브랜드 설정을 확인하세요.');
   if (!brand.discord_channel_id) {
-    return setStatus(job.id, 'failed', `브랜드 "${brand.name}"에 Discord 채널 ID가 없습니다. 브랜드 설정에서 채널을 등록하세요.`);
+    return fail(job.id, `브랜드 "${brand.name}"에 Discord 채널 ID가 없습니다. 브랜드 설정에서 채널을 등록하세요.`);
   }
   setStatus(job.id, 'generating');
 
@@ -72,7 +81,7 @@ async function runJob(job) {
   if (code !== 0) {
     let tail = '';
     try { tail = fs.readFileSync(path.join(dir, 'pipeline.log'), 'utf8').slice(-500); } catch {}
-    return setStatus(job.id, 'failed', tail || `generate.sh exit ${code}`);
+    return fail(job.id, tail || `generate.sh exit ${code}`);
   }
 
   // 4. preview + approval via bot Discord tunggal (satu proses, channel per brand)
@@ -149,7 +158,7 @@ function tick() {
   if (!job) return;
   running = true;
   runJob(job)
-    .catch(e => { try { setStatus(job.id, 'failed', String(e && e.message || e).slice(0, 500)); } catch (e2) { console.error('worker setStatus:', e2); } })
+    .catch(e => { try { fail(job.id, String(e && e.message || e).slice(0, 500)); } catch (e2) { console.error('worker fail:', e2); } })
     .finally(() => { running = false; });
 }
 

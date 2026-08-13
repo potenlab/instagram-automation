@@ -131,6 +131,21 @@ async function approvalLoop({ channel, jobId, brand, dir, title, regenLabel, reg
   }
 }
 
+// ---- dipanggil worker saat job gagal ----
+// Tanpa ini, dari sisi Discord "gagal" dan "masih diproses" sama-sama sunyi.
+async function notifyFailure(jobId, reason) {
+  if (!client || !client.isReady()) return;
+  const job = db.prepare('SELECT * FROM jobs WHERE id=?').get(jobId);
+  if (!job) return;
+  const brand = db.prepare('SELECT * FROM brands WHERE id=?').get(job.brand_id);
+  if (!brand || !brand.discord_channel_id) return;
+  const channel = await client.channels.fetch(brand.discord_channel_id);
+  const detail = String(reason || '').trim().slice(-600) || '(원인 불명)';
+  await channel.send(
+    `❌ **#${jobId} ${brand.name}** — 생성 실패\n\`\`\`\n${detail}\n\`\`\`\n원인을 고친 뒤 웹 UI 대기열에서 다시 실행하세요. 브리프는 그대로 보관돼 있어요.`
+      .slice(0, 2000));
+}
+
 // ---- dipanggil worker: preview + approval untuk job hasil pipeline ----
 async function preview(jobId) {
   if (!client || !client.isReady()) throw new Error('Discord bot belum siap');
@@ -245,4 +260,4 @@ function start() {
   client.login(process.env.DISCORD_BOT_TOKEN).catch(e => console.error('intake login gagal:', e.message));
 }
 
-module.exports = { start, preview };
+module.exports = { start, preview, notifyFailure };
