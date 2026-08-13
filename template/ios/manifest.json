@@ -1,0 +1,4 @@
+{
+  "name": "iOS 팝업",
+  "defaults": { "cover": "cover-notif.html", "body": "body-notes.html", "cta": "last-popup.html" }
+}

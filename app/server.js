@@ -81,6 +81,80 @@ app.delete('/api/brands/:id', (req, res) => {
   res.json({ ok: true });
 });
 
+// --- templates (families + preview untuk picker di 자료함) ---
+const fill = require('../scripts/fill');
+const TPL_ROOT = path.join(ROOT, 'template');
+
+function templateCatalog() {
+  const out = [
+    { id: 'slide.html', name: '기본 (다크)', layouts: [], previews: [{ name: '미리보기', url: '/tpl-preview/slide.html' }] },
+    { id: 'slide-light.html', name: '기본 (라이트)', layouts: [], previews: [{ name: '미리보기', url: '/tpl-preview/slide-light.html' }] },
+  ];
+  for (const d of fs.readdirSync(TPL_ROOT, { withFileTypes: true })) {
+    if (!d.isDirectory()) continue;
+    const mf = path.join(TPL_ROOT, d.name, 'manifest.json');
+    if (!fs.existsSync(mf)) continue;
+    const manifest = JSON.parse(fs.readFileSync(mf, 'utf8'));
+    const layouts = fs.readdirSync(path.join(TPL_ROOT, d.name)).filter(f => f.endsWith('.html')).sort();
+    out.push({
+      id: d.name, name: manifest.name || d.name, layouts,
+      previews: layouts.map(l => ({ name: l.replace('.html', ''), url: `/tpl-preview/${d.name}/${l}` })),
+    });
+  }
+  return out;
+}
+
+app.get('/api/templates', (req, res) => res.json(templateCatalog()));
+
+// sample data — semua {{key}} yang dipakai layout mana pun
+const SAMPLE_BG = 'data:image/svg+xml,' + encodeURIComponent(
+  `<svg xmlns="http://www.w3.org/2000/svg" width="108" height="135"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#2b4d63"/><stop offset=".55" stop-color="#3c6e71"/><stop offset="1" stop-color="#b8874f"/></linearGradient></defs><rect width="108" height="135" fill="url(#g)"/></svg>`);
+const TPL_SAMPLE = {
+  logo_block: '<div class="logo">브랜드<span class="dot">.</span></div>',
+  brand_name: '브랜드', brand_initial: 'B', handle: '@brand', source: '@출처',
+  page: 2, total: 6, bg_url: SAMPLE_BG,
+  headline: '인스타 카드뉴스\n<span class="hl">타이틀</span>',
+  headline_lines: '<span class="line">인스타 카드뉴스</span><span class="line"><span class="hl">타이틀</span></span>',
+  sub: '서브 타이틀', body: '내용을 작성해주세요.\n중요한 부분은 <span class="hl">하이라이트</span> 처리돼요.',
+  badge: 'TOPIC', number: '01', cta: '팔로우하고 소식받기', tip: 'tip 내용을 작성해주세요',
+  q: '질문을 작성해주세요.', note_hand: 'Check this out!', emoji: '🫶', avatar_style: '',
+  tags: '#키워드  #키워드  #키워드',
+  item1_icon: '💡', item1_title: '제목', item1_desc: '한 줄 설명',
+  item2_icon: '🚀', item2_title: '제목', item2_desc: '한 줄 설명',
+  item3_icon: '✨', item3_title: '제목', item3_desc: '한 줄 설명',
+  chat1: '질문 있어요!', chat2: '이거 어떻게 해요?', chat3: '답변을 작성해주세요.', chat4: '자세한 내용은 다음 장에!',
+  notif1_icon: '✉️', notif1_title: 'Title', notif1_desc: 'Description.',
+  notif2_icon: '🔔', notif2_title: 'Title', notif2_desc: 'Description.',
+};
+
+// legacy single-file templates (template root) — placeholder set beda dari family
+app.get('/tpl-preview/:file', (req, res) => {
+  const file = path.basename(req.params.file);
+  const p = path.join(TPL_ROOT, file);
+  if (!file.endsWith('.html') || !fs.existsSync(p)) return res.status(404).end();
+  const css = file.includes('light') ? 'brand-light.css' : 'brand.css';
+  const html = fill(fs.readFileSync(p, 'utf8'), {
+    ...TPL_SAMPLE,
+    role_class: 'cover',
+    badge: '<div class="badge">TOPIC</div>',
+    number: '',
+    source_chip: '',
+    body_block: '<div class="sub">서브 타이틀 — 내용을 작성해주세요</div>',
+    cta_block: '',
+    footer_right: '밀어서 넘기기 →',
+  }).replace(`href="${css}"`, `href="/tpl-src/${css}"`);
+  res.type('html').send(html);
+});
+
+app.get('/tpl-preview/:family/:file', (req, res) => {
+  const p = path.resolve(TPL_ROOT, req.params.family, req.params.file);
+  if (!p.startsWith(TPL_ROOT + path.sep) || !p.endsWith('.html') || !fs.existsSync(p)) return res.status(404).end();
+  const html = fill(fs.readFileSync(p, 'utf8'), TPL_SAMPLE)
+    .replace('href="style.css"', `href="/tpl-src/${req.params.family}/style.css"`);
+  res.type('html').send(html);
+});
+app.use('/tpl-src', express.static(TPL_ROOT));
+
 // --- jobs ---
 const upload = multer({
   dest: path.join(UPLOADS, 'tmp'),
@@ -89,16 +163,17 @@ const upload = multer({
 });
 
 app.post('/api/jobs', upload.array('materials', 10), (req, res) => {
-  const { brand_id, topic, note } = req.body || {};
+  const { brand_id, topic, note, template } = req.body || {};
   const brand = db.prepare('SELECT * FROM brands WHERE id=?').get(brand_id);
   if (!brand) return res.status(400).json({ error: '브랜드를 선택하세요' });
   const files = req.files || [];
   if ((!topic || !topic.trim()) && !files.length) return res.status(400).json({ error: '주제 또는 자료 이미지를 넣어주세요' });
 
+  const tpl = templateCatalog().some(t => t.id === template) ? template : null; // null = ikut default brand
   const mode = files.length ? 'materials' : 'topic';
   const ts = new Date().toISOString();
-  const r = db.prepare(`INSERT INTO jobs(brand_id, mode, topic, status, created_at, updated_at)
-    VALUES (?, ?, ?, 'stock', ?, ?)`).run(brand.id, mode, (topic || '').trim(), ts, ts);
+  const r = db.prepare(`INSERT INTO jobs(brand_id, mode, topic, status, template, created_at, updated_at)
+    VALUES (?, ?, ?, 'stock', ?, ?, ?)`).run(brand.id, mode, (topic || '').trim(), tpl, ts, ts);
   const jobId = r.lastInsertRowid;
 
   if (files.length) {

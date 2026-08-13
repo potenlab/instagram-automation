@@ -16,7 +16,8 @@ if [ ! -f "$DIR/content.json" ]; then
   [ -n "$TOPIC" ] || { echo "content.json belum ada — kasih topik sebagai argumen ke-2"; exit 1; }
   echo "$TOPIC" > "$DIR/topic.txt"   # disimpan supaya approve-bot bisa regen full
   echo "== claude -p: nulis konten =="
-  { cat "$ROOT/prompts/card-news.md"; printf '\n## 주제\n\n%s\n' "$TOPIC"; } \
+  LAYOUT_DOC="$ROOT/prompts/layouts-${TEMPLATE:-}.md"   # family template → layout instructions ikut prompt
+  { cat "$ROOT/prompts/card-news.md"; [ -f "$LAYOUT_DOC" ] && cat "$LAYOUT_DOC"; printf '\n## 주제\n\n%s\n' "$TOPIC"; } \
     | claude -p --allowedTools WebFetch Read \
     | node -e 'const s=require("fs").readFileSync(0,"utf8");const a=s.indexOf("{"),b=s.lastIndexOf("}");process.stdout.write(a<0?s:s.slice(a,b+1))' > "$DIR/content.json"
   jq . "$DIR/content.json" > /dev/null || { echo "output bukan JSON valid — cek $DIR/content.json"; exit 1; }
@@ -44,7 +45,8 @@ for i in $(seq 1 "$COUNT"); do
     cp "$DIR/materials/$MAT" "$BG"
     continue
   fi
-  PROMPT=$(jq -r ".slides[$((i-1))].image_prompt" "$DIR/content.json")
+  PROMPT=$(jq -r ".slides[$((i-1))].image_prompt // empty" "$DIR/content.json")
+  [ -n "$PROMPT" ] || { echo "== background $i/$COUNT: skip (layout tanpa foto) =="; continue; }
   echo "== background $i/$COUNT =="
   JOB=$(higgsfield generate create "$MODEL" \
     --prompt "$PROMPT" --aspect_ratio 4:5 --wait --json)

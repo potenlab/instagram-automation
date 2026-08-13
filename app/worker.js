@@ -66,7 +66,7 @@ async function runJob(job) {
   // 3. generate.sh
   const code = await spawnLogged(
     path.join(ROOT, 'scripts', 'generate.sh'), [postDir, topic],
-    { cwd: ROOT, env: { ...process.env, HF_MODEL: process.env.HF_MODEL || '', TEMPLATE: brand.template || 'slide.html', BRAND_NAME: brand.name || '', BRAND_HANDLE: brand.handle || '' } },
+    { cwd: ROOT, env: { ...process.env, HF_MODEL: process.env.HF_MODEL || '', TEMPLATE: job.template || brand.template || 'slide.html', BRAND_NAME: brand.name || '', BRAND_HANDLE: brand.handle || '' } },
     path.join(dir, 'pipeline.log'),
   );
   if (code !== 0) {

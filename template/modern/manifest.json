@@ -1,0 +1,4 @@
+{
+  "name": "모던",
+  "defaults": { "cover": "cover-grad.html", "body": "body-photo-card.html", "cta": "last-follow.html" }
+}

@@ -78,7 +78,12 @@ Per-post artifacts live in `out/<post-id>/`: `content.json` (copy), `backgrounds
 
 ## Templates
 
-`template/slide.html` + `brand.css` (dark) and `slide-light.html` + `brand-light.css` (light). Placeholders: `{{role_class}} {{bg_url}} {{logo_block}} {{page}} {{total}} {{badge}} {{number}} {{source_chip}} {{headline}} {{body_block}} {{cta_block}} {{handle}} {{footer_right}}`. Set a brand's template file in the 브랜드 page. Copy rules for the AI live in `prompts/card-news.md`.
+Two kinds:
+
+- **Legacy single-file**: `template/slide.html` + `brand.css` (dark) and `slide-light.html` + `brand-light.css` (light). Placeholders: `{{role_class}} {{bg_url}} {{logo_block}} {{page}} {{total}} {{badge}} {{number}} {{source_chip}} {{headline}} {{body_block}} {{cta_block}} {{handle}} {{footer_right}}`.
+- **Families** (Figma 인스타 템플릿): `template/modern/` (12 layouts) and `template/ios/` (9 layouts). Each family = one `style.css` + one HTML per layout + `manifest.json` (display name + per-role default layout). The AI picks a layout per slide via the slide's `layout` field, guided by `prompts/layouts-<family>.md`; layouts without an `image_prompt` skip background generation.
+
+Pick the default per brand in 브랜드, or per post in 자료함 (live thumbnails via `/tpl-preview/<family>/<layout>`). Copy rules for the AI live in `prompts/card-news.md`.
 
 ## Troubleshooting
 

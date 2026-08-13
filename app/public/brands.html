@@ -48,8 +48,10 @@
       <input type="text" id="ig_account_id">
       <label for="rss_feeds">RSS 피드 <span style="font-weight:500;color:var(--faint)">쉼표로 구분</span></label>
       <input type="text" id="rss_feeds">
-      <label for="template">템플릿 파일</label>
-      <input type="text" id="template" placeholder="slide.html">
+      <label>기본 템플릿 <span style="font-weight:500;color:var(--faint)">이 계정의 카드뉴스 디자인 — 자료함에서 게시물별로 바꿀 수 있어요</span></label>
+      <input type="hidden" id="template">
+      <div class="brand-pills" id="tplPills"></div>
+      <div id="tplPreview" style="display:none;gap:12px;overflow-x:auto;margin-top:12px;padding-bottom:6px"></div>
       <label for="prompt_rules">카피 규칙 <span style="font-weight:500;color:var(--faint)">프롬프트에 추가됨</span></label>
       <textarea id="prompt_rules"></textarea>
       <div style="margin-top:20px; display:flex; gap:10px">
@@ -64,6 +66,51 @@
 const $ = id => document.getElementById(id);
 const FIELDS = ['name', 'handle', 'discord_channel_id', 'ig_account_id', 'rss_feeds', 'template', 'prompt_rules'];
 let brands = [];
+
+// --- template picker (pill + live thumbnail, sama seperti 자료함) ---
+let templates = [];
+fetch('/api/templates').then(r => r.json())
+  .then(list => { templates = list; renderTplPills(); })
+  .catch(() => {})
+  .finally(load); // brand list tetap tampil walau catalog gagal
+
+const tplName = id => (templates.find(t => t.id === id) || {}).name || id || 'slide.html';
+
+function renderTplPills() {
+  const box = $('tplPills');
+  box.innerHTML = '';
+  const current = $('template').value || 'slide.html';
+  for (const t of templates) {
+    const p = el('button', 'pill' + (t.id === current ? ' on' : ''), t.name);
+    p.type = 'button';
+    p.onclick = () => { $('template').value = t.id; renderTplPills(); };
+    box.appendChild(p);
+  }
+  renderTplPreview(current);
+}
+
+function renderTplPreview(current) {
+  const box = $('tplPreview');
+  const t = templates.find(x => x.id === current);
+  if (!t || !(t.previews || []).length) { box.style.display = 'none'; return; }
+  box.style.display = 'flex';
+  box.innerHTML = '';
+  for (const pv of t.previews) {
+    const card = el('div');
+    card.style.cssText = 'flex:none;width:162px';
+    const frame = el('div');
+    frame.style.cssText = 'width:162px;height:203px;overflow:hidden;border-radius:10px;border:1px solid rgba(255,255,255,.12);background:#111';
+    const ifr = document.createElement('iframe');
+    ifr.src = pv.url;
+    ifr.loading = 'lazy';
+    ifr.style.cssText = 'width:1080px;height:1350px;transform:scale(.15);transform-origin:top left;border:0;pointer-events:none';
+    frame.appendChild(ifr);
+    const cap = el('div', null, pv.name);
+    cap.style.cssText = 'font-size:11px;opacity:.65;margin-top:5px;text-align:center;overflow:hidden;text-overflow:ellipsis;white-space:nowrap';
+    card.append(frame, cap);
+    box.appendChild(card);
+  }
+}
 
 async function api(url, opts) {
   const res = await fetch(url, opts);
@@ -104,7 +151,7 @@ async function load() {
     rows.appendChild(row('Discord', b.discord_channel_id ? '연결됨' : '미설정', !!b.discord_channel_id));
     rows.appendChild(row('Instagram', b.ig_account_id ? '연결됨' : '미설정', !!b.ig_account_id));
     rows.appendChild(row('RSS', b.rss_feeds ? '활성' : '—', !!b.rss_feeds));
-    rows.appendChild(row('템플릿', b.template || 'slide.html'));
+    rows.appendChild(row('템플릿', tplName(b.template)));
     card.appendChild(rows);
 
     const actions = el('div', 'actions');
@@ -127,6 +174,7 @@ function openForm(b) {
   $('ftitle').textContent = b ? '브랜드 편집 — ' + b.name : '브랜드 추가';
   $('bid').value = b ? b.id : '';
   for (const f of FIELDS) $(f).value = b ? (b[f] || '') : (f === 'template' ? 'slide.html' : '');
+  renderTplPills();
   $('err').textContent = '';
   $('f').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   $('name').focus();
@@ -151,7 +199,6 @@ $('f').onsubmit = async (e) => {
   load();
 };
 
-load();
 </script>
 </body>
 </html>

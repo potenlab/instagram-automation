@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
+<link rel="stylesheet" href="style.css">
+</head>
+<body class="cover-notif">
+  <div class="wallpaper"></div>
+  <div class="statusbar">
+    {{logo_block}}
+    <div class="sysicons">
+      <svg width="46" height="30" viewBox="0 0 46 30" fill="#fff"><rect x="0" y="18" width="7" height="12" rx="2"/><rect x="12" y="12" width="7" height="18" rx="2"/><rect x="24" y="6" width="7" height="24" rx="2"/><rect x="36" y="0" width="7" height="30" rx="2"/></svg>
+      <svg width="42" height="30" viewBox="0 0 42 30" fill="#fff"><path d="M21 30l-6.6-8.2a8.5 8.5 0 0113.2 0L21 30zM8.4 14.5a17.5 17.5 0 0125.2 0l-4.3 5.3a11 11 0 00-16.6 0l-4.3-5.3zM0 6.8a29 29 0 0142 0l-4.3 5.3a22.5 22.5 0 00-33.4 0L0 6.8z"/></svg>
+      <svg width="58" height="30" viewBox="0 0 58 30"><rect x="1" y="1" width="48" height="28" rx="8" fill="none" stroke="#fff" stroke-opacity=".5" stroke-width="2"/><rect x="5" y="5" width="34" height="20" rx="5" fill="#fff"/><path d="M52 10v10a6 6 0 000-10z" fill="#fff" fill-opacity=".5"/></svg>
+    </div>
+  </div>
+  <div class="headline">{{headline}}</div>
+  <div class="stack">
+    <div class="notif">
+      <div class="icon">{{notif1_icon}}</div>
+      <div><div class="nt">{{notif1_title}}</div><div class="nd">{{notif1_desc}}</div></div>
+      <div class="ntime">지금</div>
+    </div>
+  </div>
+  <div class="widget photo" style="background-image:url('{{bg_url}}')"></div>
+  <div class="logo-bottom">{{logo_block}}</div>
+</body>
+</html>

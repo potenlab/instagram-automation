@@ -6,3 +6,4 @@ app/data.db
 app/uploads/
 app/data.db*
 .DS_Store
+app/server.log

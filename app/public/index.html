@@ -34,6 +34,10 @@
         <label>브랜드</label>
         <div class="brand-pills" id="brandPills"></div>
 
+        <label style="margin-top:22px">템플릿 <span class="opt">이 게시물의 디자인 — 기본값은 브랜드 설정을 따릅니다</span></label>
+        <div class="brand-pills" id="tplPills"></div>
+        <div id="tplPreview" style="display:none;gap:12px;overflow-x:auto;margin-top:12px;padding-bottom:6px"></div>
+
         <label for="topic" style="margin-top:22px">주제 / 기사 URL <span class="opt">선택 — 비우면 AI가 사진을 보고 정합니다</span></label>
         <textarea id="topic" placeholder="예: 포텐스튜디오 공간 소개 / 기사 URL / 비워두기"></textarea>
 
@@ -117,6 +121,53 @@ async function loadBrands() {
     p.textContent = b.name;
     p.onclick = () => { brandId = b.id; loadBrands(); loadStock(); renderSources(); };
     box.appendChild(p);
+  }
+}
+
+// --- template picker ---
+let templates = [], tplChoice = null; // null = default brand
+
+async function loadTemplates() {
+  templates = await (await api('/api/templates')).json();
+  renderTplPills();
+}
+
+function renderTplPills() {
+  const box = $('tplPills');
+  box.innerHTML = '';
+  const opts = [{ id: null, name: '브랜드 기본' }, ...templates];
+  for (const t of opts) {
+    const p = document.createElement('button');
+    p.type = 'button';
+    p.className = 'pill' + (t.id === tplChoice ? ' on' : '');
+    p.textContent = t.name;
+    p.onclick = () => { tplChoice = t.id; renderTplPills(); };
+    box.appendChild(p);
+  }
+  renderTplPreview();
+}
+
+function renderTplPreview() {
+  const box = $('tplPreview');
+  const t = templates.find(x => x.id === tplChoice);
+  if (!t || !(t.previews || []).length) { box.style.display = 'none'; return; }
+  box.style.display = 'flex';
+  box.innerHTML = '';
+  for (const pv of t.previews) {
+    const card = document.createElement('div');
+    card.style.cssText = 'flex:none;width:162px';
+    const frame = document.createElement('div');
+    frame.style.cssText = 'width:162px;height:203px;overflow:hidden;border-radius:10px;border:1px solid rgba(255,255,255,.12);background:#111';
+    const ifr = document.createElement('iframe');
+    ifr.src = pv.url;
+    ifr.loading = 'lazy';
+    ifr.style.cssText = 'width:1080px;height:1350px;transform:scale(.15);transform-origin:top left;border:0;pointer-events:none';
+    frame.appendChild(ifr);
+    const cap = document.createElement('div');
+    cap.style.cssText = 'font-size:11px;opacity:.65;margin-top:5px;text-align:center;overflow:hidden;text-overflow:ellipsis;white-space:nowrap';
+    cap.textContent = pv.name;
+    card.append(frame, cap);
+    box.appendChild(card);
   }
 }
 
@@ -261,6 +312,7 @@ $('f').onsubmit = async (e) => {
   $('submit').disabled = true;
   const fd = new FormData();
   fd.append('brand_id', brandId);
+  if (tplChoice) fd.append('template', tplChoice);
   fd.append('topic', $('topic').value.trim());
   fd.append('note', $('note').value);
   for (const f of picked) fd.append('materials', f);
@@ -279,6 +331,7 @@ $('f').onsubmit = async (e) => {
 };
 
 loadBrands().then(() => { loadStock(); renderSources(); });
+loadTemplates();
 </script>
 </body>
 </html>

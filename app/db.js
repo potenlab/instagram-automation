@@ -39,6 +39,9 @@ CREATE TABLE IF NOT EXISTS materials(
 );
 `);
 
+// migrasi ringan: jobs.template (pilihan template per job dari web UI)
+try { db.exec('ALTER TABLE jobs ADD COLUMN template TEXT'); } catch {}
+
 // seed sekali saja kalau brands kosong
 if (db.prepare('SELECT COUNT(*) AS c FROM brands').get().c === 0) {
   let channel = '';
