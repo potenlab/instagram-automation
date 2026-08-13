@@ -1,0 +1,175 @@
+/* TIER family — plum + hot pink + chrome. Shared by all template/tier/*.html
+   Referensi: key visual TIER (logo chrome, latar plum bergaris diagonal) + tier-sigma.vercel.app */
+:root {
+  --plum: #421C33;
+  --plum-hi: #56294A;
+  --plum-deep: #24091A;
+  --pink: #FF1F8F;
+  --pink-deep: #C71271;
+  --pink-veil: rgba(255, 31, 143, .14);
+  --text: #FFFFFF;
+  --sub: rgba(255, 255, 255, .62);
+  --faint: rgba(255, 255, 255, .38);
+  --hair: rgba(255, 255, 255, .12);
+  --font: 'Pretendard Variable', Pretendard, 'Noto Sans KR', sans-serif;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html, body { width: 1080px; height: 1350px; }
+body {
+  font-family: var(--font);
+  color: var(--text);
+  overflow: hidden;
+  position: relative;
+  word-break: keep-all;
+  background: var(--plum);
+}
+
+/* Latar plum: highlight lembut di atas-tengah, menggelap ke tepi + garis diagonal tipis */
+body::before {
+  content: ''; position: absolute; inset: 0; z-index: 0;
+  background:
+    radial-gradient(120% 80% at 50% 12%, var(--plum-hi) 0%, rgba(86, 41, 74, 0) 62%),
+    radial-gradient(90% 70% at 88% 96%, rgba(60, 30, 60, .55) 0%, rgba(60, 30, 60, 0) 60%),
+    linear-gradient(158deg, #46203A 0%, var(--plum) 46%, #38182E 100%);
+}
+/* garis diagonal tipis — naik ke kanan, seperti key visual */
+body::after {
+  content: ''; position: absolute; inset: -20%; z-index: 0;
+  background: repeating-linear-gradient(
+    348deg,
+    rgba(255, 255, 255, 0) 0px,
+    rgba(255, 255, 255, 0) 132px,
+    rgba(255, 255, 255, .05) 132px,
+    rgba(255, 255, 255, .05) 135px);
+}
+body > * { position: relative; z-index: 1; }
+
+/* Foto latar (slide yang punya image_prompt) — selalu diselimuti plum agar teks terbaca */
+.bg { position: absolute; inset: 0; z-index: 0; background: var(--plum-deep) center/cover no-repeat; }
+.bg::after {
+  content: ''; position: absolute; inset: 0;
+  background: linear-gradient(180deg, rgba(36, 9, 26, .22) 0%, rgba(66, 28, 51, .48) 42%, rgba(36, 9, 26, .93) 100%);
+}
+
+/* ---- elemen bersama ---- */
+/* flex:none + align-self supaya logo tidak ikut melar di layout kolom */
+.logo-mark { display: block; height: 108px; width: auto; flex: none; align-self: flex-start; }
+.logo-mark.sm { height: 62px; }
+.logo-mark.xs { height: 46px; }
+
+.hl { color: var(--pink); }
+.headline { font-weight: 800; letter-spacing: -.035em; line-height: 1.24; white-space: pre-line; }
+.sub, .body { line-height: 1.62; white-space: pre-line; color: var(--sub); }
+
+.badge {
+  display: inline-flex; align-items: center; gap: 14px;
+  font-size: 24px; font-weight: 700; letter-spacing: .16em;
+  padding: 14px 30px; border-radius: 999px;
+  border: 1px solid var(--hair); background: rgba(255, 255, 255, .05);
+  color: rgba(255, 255, 255, .82);
+}
+.badge::before { content: ''; width: 12px; height: 12px; border-radius: 50%; background: var(--pink); }
+
+.foot {
+  position: absolute; left: 84px; right: 84px; bottom: 56px;
+  display: flex; justify-content: space-between; align-items: center;
+  font-size: 26px; font-weight: 600; color: var(--faint);
+}
+.foot .handle { color: rgba(255, 255, 255, .58); }
+
+/* ---- cover-logo: logo chrome + judul tengah (key visual utama) ---- */
+.cover-logo { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 96px 84px 150px; text-align: center; }
+.cover-logo .badge { margin-bottom: 66px; }
+.cover-logo .logo-mark { height: 176px; margin-bottom: 74px; align-self: center; }
+.cover-logo .headline { font-size: 74px; }
+.cover-logo .sub { font-size: 33px; margin-top: 40px; }
+
+/* ---- cover-photo: foto full-bleed, judul di bawah ---- */
+.cover-photo { padding: 84px; display: flex; flex-direction: column; }
+.cover-photo .logo-mark { height: 74px; }
+.cover-photo .badge { margin-top: auto; align-self: flex-start; }
+.cover-photo .headline { font-size: 82px; margin-top: 34px; }
+.cover-photo .sub { font-size: 32px; margin-top: 28px; padding-bottom: 62px; }
+
+/* ---- body-tier: kartu satu kelas TIER (GOD / ALPHA / …) ---- */
+.body-tier { padding: 96px 84px 150px; display: flex; flex-direction: column; }
+.body-tier .top { display: flex; justify-content: space-between; align-items: center; }
+.body-tier .card {
+  margin: auto 0; padding: 78px 66px; border-radius: 40px;
+  border: 1px solid rgba(255, 31, 143, .42); background: linear-gradient(160deg, var(--pink-veil), rgba(255, 255, 255, .03));
+}
+.body-tier .grade {
+  font-size: 148px; font-weight: 800; letter-spacing: -.05em; line-height: 1;
+  background: linear-gradient(180deg, #FFFFFF 0%, #FFD3E9 40%, var(--pink) 62%, #FF61B0 100%);
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+}
+.body-tier .dist {
+  display: inline-block; margin-top: 30px; padding: 12px 28px; border-radius: 999px;
+  background: var(--pink); color: #fff; font-size: 30px; font-weight: 800;
+}
+.body-tier .headline { font-size: 46px; margin-top: 44px; }
+.body-tier .body { font-size: 32px; margin-top: 26px; }
+
+/* ---- body-stat: satu angka besar (12개 지표 / 92% / 3분) ---- */
+.body-stat { padding: 110px 84px 150px; display: flex; flex-direction: column; justify-content: center; }
+.body-stat .num {
+  font-size: 260px; font-weight: 800; letter-spacing: -.06em; line-height: .9; color: var(--pink);
+  text-shadow: 0 0 70px rgba(255, 31, 143, .45);
+}
+.body-stat .headline { font-size: 62px; margin-top: 46px; }
+.body-stat .body { font-size: 33px; margin-top: 30px; }
+.body-stat .rule { width: 148px; height: 8px; background: var(--pink); margin-top: 56px; }
+
+/* ---- body-list: 3 poin bernomor ---- */
+.body-list { padding: 100px 84px 150px; display: flex; flex-direction: column; }
+.body-list .headline { font-size: 60px; }
+.body-list .items { flex: 1; margin-top: 60px; display: flex; flex-direction: column; justify-content: center; gap: 38px; }
+.body-list .item {
+  display: flex; gap: 32px; align-items: flex-start;
+  padding: 46px 44px; border-radius: 28px;
+  border: 1px solid var(--hair); background: rgba(255, 255, 255, .045);
+}
+.body-list .item .idx {
+  flex: none; width: 66px; height: 66px; border-radius: 50%;
+  background: var(--pink); color: #fff; font-size: 32px; font-weight: 800;
+  display: flex; align-items: center; justify-content: center;
+}
+.body-list .item .t { font-size: 38px; font-weight: 800; letter-spacing: -.02em; }
+.body-list .item .d { font-size: 28px; line-height: 1.55; color: var(--sub); margin-top: 12px; }
+.body-list .body { font-size: 30px; padding-top: 44px; }
+
+/* ---- body-text: chip + judul + isi ---- */
+.body-text { padding: 120px 84px 150px; display: flex; flex-direction: column; justify-content: center; }
+.body-text .chip {
+  align-self: flex-start; font-size: 27px; font-weight: 800; letter-spacing: .04em;
+  padding: 12px 26px; border-radius: 12px; background: var(--pink); color: #fff;
+}
+.body-text .headline { font-size: 68px; margin-top: 40px; }
+.body-text .body { font-size: 34px; margin-top: 38px; }
+
+/* ---- body-photo: judul + isi + kartu foto ---- */
+.body-photo { padding: 96px 84px 150px; display: flex; flex-direction: column; }
+.body-photo .headline { font-size: 58px; margin-top: 34px; }
+.body-photo .body { font-size: 31px; margin-top: 26px; }
+.body-photo .shot {
+  flex: 1; margin-top: 46px; border-radius: 34px; overflow: hidden;
+  border: 1px solid var(--hair); background: var(--plum-deep) center/cover no-repeat; position: relative;
+}
+.body-photo .shot::after {
+  content: ''; position: absolute; inset: 0;
+  background: linear-gradient(180deg, rgba(66, 28, 51, .12), rgba(36, 9, 26, .6));
+}
+.body-photo .source { font-size: 25px; font-weight: 600; color: var(--faint); margin-top: 24px; }
+
+/* ---- last-cta: penutup + tombol pink ---- */
+.last-cta { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 96px 84px 150px; text-align: center; }
+.last-cta .logo-mark { height: 132px; margin-bottom: 62px; align-self: center; }
+.last-cta .headline { font-size: 70px; }
+.last-cta .body { font-size: 32px; margin-top: 32px; }
+.last-cta .pill {
+  margin-top: 62px; padding: 30px 66px; border-radius: 999px;
+  background: var(--pink); color: #fff; font-size: 38px; font-weight: 800;
+  box-shadow: 0 0 64px rgba(255, 31, 143, .5);
+}
+.last-cta .handle { margin-top: 40px; font-size: 30px; font-weight: 700; color: rgba(255, 255, 255, .7); }

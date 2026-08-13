@@ -1,0 +1,4 @@
+{
+  "name": "티어 (TIER)",
+  "defaults": { "cover": "cover-logo.html", "body": "body-text.html", "cta": "last-cta.html" }
+}
