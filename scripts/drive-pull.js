@@ -57,7 +57,7 @@ function main() {
     const i = args.indexOf(name);
     return i >= 0 && args[i + 1] ? args[i + 1] : fallback;
   };
-  const limit = parseInt(flag('--limit', '4'), 10) || 4;
+  const limit = parseInt(flag('--limit', '8'), 10) || 8;   // banyak kandidat; manusia yang memilih di Discord
   const dryRun = args.includes('--dry-run');
   const note = flag('--note', 'Google Drive');
 

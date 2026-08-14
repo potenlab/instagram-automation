@@ -6,7 +6,7 @@
 const fs = require('fs');
 const path = require('path');
 const { spawn, execFile } = require('child_process');
-const { Client, GatewayIntentBits, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
+const { Client, GatewayIntentBits, ActionRowBuilder, ButtonBuilder, ButtonStyle, StringSelectMenuBuilder } = require('discord.js');
 const db = require('./db');
 
 const ROOT = path.resolve(__dirname, '..');
@@ -144,6 +144,81 @@ async function approvalLoop({ channel, jobId, brand, dir, title, regenLabel, reg
   }
 }
 
+// ---- dipanggil worker: pilih foto dulu sebelum generate ----
+// Bahan dari Drive dipilih AI tanpa mata manusia, dan hasilnya bisa jelek.
+// Di sini semua kandidat ditawarkan; yang tidak dipilih dibuang sebelum generate.
+async function selectMaterials(jobId) {
+  if (!client || !client.isReady()) throw new Error('Discord bot belum siap');
+  const job = db.prepare('SELECT * FROM jobs WHERE id=?').get(jobId);
+  const brand = db.prepare('SELECT * FROM brands WHERE id=?').get(job.brand_id);
+  const channel = await client.channels.fetch(brand.discord_channel_id);
+  const mats = db.prepare('SELECT * FROM materials WHERE job_id=? ORDER BY id').all(jobId);
+  if (!mats.length) throw new Error('tidak ada bahan untuk dipilih');
+
+  const dir = path.join(UPLOADS, String(jobId));
+  const files = mats.map(m => path.join(dir, m.filename)).filter(f => fs.existsSync(f));
+
+  const options = mats.slice(0, 25).map((m, i) => ({
+    label: `${i + 1}. ${m.filename}`.slice(0, 100),
+    value: String(m.id),
+  }));
+  const menu = new StringSelectMenuBuilder()
+    .setCustomId('pick')
+    .setPlaceholder('게시물에 쓸 사진을 고르세요 (여러 장 가능)')
+    .setMinValues(1)
+    .setMaxValues(Math.min(options.length, 10))
+    .addOptions(options);
+
+  const msg = await channel.send({
+    content: `🖼️ **#${jobId} ${brand.name}** — 사진 선택\n`
+      + `자료 ${mats.length}장을 가져왔어요. 게시물에 쓸 사진만 골라주세요.\n`
+      + `고른 사진만 남기고 나머지는 버린 뒤 카드뉴스를 만듭니다.\n`
+      + mats.map((m, i) => `${i + 1}. ${m.filename}`).join('\n').slice(0, 1200),
+    files: files.slice(0, 10),
+    components: [
+      new ActionRowBuilder().addComponents(menu),
+      new ActionRowBuilder().addComponents(
+        new ButtonBuilder().setCustomId('useall').setLabel('전부 사용').setStyle(ButtonStyle.Secondary),
+        new ButtonBuilder().setCustomId('cancel').setLabel('❌ 취소').setStyle(ButtonStyle.Danger),
+      ),
+    ],
+  });
+  setStatus(jobId, 'selecting');
+  db.prepare('UPDATE jobs SET selection=?, discord_message_id=? WHERE id=?').run('pending', msg.id, jobId);
+  awaitSelection(msg, jobId, mats).catch(e => console.error(`intake selectMaterials #${jobId}:`, e.message));
+}
+
+// Menunggu pilihan; dipisah supaya bisa disambung ulang setelah restart.
+async function awaitSelection(msg, jobId, mats) {
+  const press = await msg.awaitMessageComponent({ time: 24 * 3600 * 1000 }).catch(() => null);
+  if (!press) return msg.edit({ components: [] });
+
+  if (press.customId === 'cancel') {
+    db.prepare('UPDATE jobs SET selection=NULL, discord_message_id=NULL WHERE id=?').run(jobId);
+    setStatus(jobId, 'failed', `사진 선택 취소됨 (${press.user.username})`);
+    return press.update({ content: `❌ **#${jobId}** — 취소되었습니다.`, components: [] });
+  }
+
+  const keep = press.customId === 'useall'
+    ? mats.map(m => String(m.id))
+    : press.values;
+  const dropped = mats.filter(m => !keep.includes(String(m.id)));
+  const dir = path.join(UPLOADS, String(jobId));
+  for (const m of dropped) {
+    fs.rmSync(path.join(dir, m.filename), { force: true });
+    db.prepare('DELETE FROM materials WHERE id=?').run(m.id);
+  }
+
+  const kept = mats.filter(m => keep.includes(String(m.id)));
+  db.prepare('UPDATE jobs SET selection=?, discord_message_id=NULL, status=?, updated_at=? WHERE id=?')
+    .run('done', 'queued', now(), jobId);
+  await press.update({
+    content: `✅ **#${jobId}** — 사진 ${kept.length}장 선택됨, 카드뉴스를 만듭니다.\n`
+      + kept.map(m => `• ${m.filename}`).join('\n').slice(0, 1200),
+    components: [],
+  });
+}
+
 // ---- dipanggil worker tiap ganti tahap ----
 // Antara "접수" dan preview dulu tidak ada tanda apa pun, jadi proses lambat dan
 // proses macet terlihat sama persis dari Discord.
@@ -224,13 +299,19 @@ async function preview(jobId) {
 // Listener tombol hidup di memori, jadi restart bikin preview lama mati diam-diam
 // ("The application didn't respond in time" saat ditekan).
 async function resumePending() {
-  const rows = db.prepare(`SELECT * FROM jobs WHERE status='preview' AND discord_message_id IS NOT NULL`).all();
+  const rows = db.prepare(`SELECT * FROM jobs WHERE status IN ('preview','selecting') AND discord_message_id IS NOT NULL`).all();
   for (const job of rows) {
     try {
       const brand = db.prepare('SELECT * FROM brands WHERE id=?').get(job.brand_id);
       if (!brand || !brand.discord_channel_id || !job.post_dir) continue;
       const channel = await client.channels.fetch(brand.discord_channel_id);
       const msg = await channel.messages.fetch(job.discord_message_id);
+      if (job.status === 'selecting') {
+        const mats = db.prepare('SELECT * FROM materials WHERE job_id=? ORDER BY id').all(job.id);
+        awaitSelection(msg, job.id, mats).catch(e => console.error(`intake selection #${job.id}:`, e.message));
+        console.log(`intake: pilihan foto #${job.id} disambung ulang`);
+        continue;
+      }
       const args = job.mode === 'discord-upload' ? uploadArgs(job, brand, channel) : pipelineArgs(job, brand, channel);
       approvalLoop({ ...args, resumeMsg: msg })
         .catch(e => console.error(`intake: approval #${job.id}:`, e.message));
@@ -324,4 +405,4 @@ function start() {
   client.login(process.env.DISCORD_BOT_TOKEN).catch(e => console.error('intake login gagal:', e.message));
 }
 
-module.exports = { start, preview, notifyFailure, notifyStage };
+module.exports = { start, preview, notifyFailure, notifyStage, selectMaterials };

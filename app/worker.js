@@ -58,6 +58,21 @@ async function runJob(job) {
   if (!brand.discord_channel_id) {
     return fail(job.id, `브랜드 "${brand.name}"에 Discord 채널 ID가 없습니다. 브랜드 설정에서 채널을 등록하세요.`);
   }
+  // 0. bahan dari Drive dipilih AI tanpa mata manusia — minta pilihan dulu.
+  // Upload manual (web UI / Discord) tidak lewat sini: fotonya sudah dipilih orang.
+  if (job.mode === 'drive' && job.selection !== 'done') {
+    const n = db.prepare('SELECT COUNT(*) c FROM materials WHERE job_id=?').get(job.id).c;
+    if (n > 1) {
+      try {
+        await require('./intake').selectMaterials(job.id);
+        return; // status jadi 'selecting'; lanjut setelah dipilih di Discord
+      } catch (e) {
+        console.error(`worker: minta pilihan foto #${job.id} gagal:`, e.message);
+        // bot mati / channel bermasalah → jangan blokir, lanjut apa adanya
+      }
+    }
+  }
+
   setStatus(job.id, 'generating');
 
   // 1. post dir + materials copy

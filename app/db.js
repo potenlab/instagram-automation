@@ -50,6 +50,10 @@ try { db.exec('ALTER TABLE brands ADD COLUMN zernio_api_key TEXT'); } catch {}
 // Isinya jadi bahan otomatis; kosong = fitur mati untuk brand itu.
 try { db.exec('ALTER TABLE brands ADD COLUMN drive_folder_id TEXT'); } catch {}
 
+// migrasi ringan: jobs.selection — tahap pilih foto sebelum generate.
+// null = belum ditawarkan, 'pending' = menunggu pilihan di Discord, 'done' = sudah dipilih.
+try { db.exec('ALTER TABLE jobs ADD COLUMN selection TEXT'); } catch {}
+
 // File Drive yang sudah pernah dipakai, supaya tidak diambil berulang tiap hari.
 db.exec(`CREATE TABLE IF NOT EXISTS drive_seen(
   brand_id INTEGER,
