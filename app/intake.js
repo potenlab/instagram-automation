@@ -95,39 +95,52 @@ async function publishJob(jobId, dir, brand, channel, press) {
   }
 }
 
+// id pesan preview disimpan supaya listener tombol bisa disambung lagi setelah restart
+const rememberMsg = (jobId, id) =>
+  db.prepare('UPDATE jobs SET discord_message_id=? WHERE id=?').run(id || null, jobId);
+
 // Loop preview + tombol. regen(attempt) melempar error kalau gagal; return caption baru.
-async function approvalLoop({ channel, jobId, brand, dir, title, regenLabel, regenWait, maxRegen, regen }) {
+// resumeMsg diisi saat menyambung preview lama (proses restart) — jangan kirim pesan baru.
+async function approvalLoop({ channel, jobId, brand, dir, title, regenLabel, regenWait, maxRegen, regen, resumeMsg }) {
   const caption = () => fs.readFileSync(path.join(dir, 'caption.txt'), 'utf8');
   const content = attempt =>
     `📰 **#${jobId} ${brand.name}** — ${title}${attempt ? ` (재생성 ${attempt}/${maxRegen})` : ''}\n\n${caption()}`.slice(0, 2000);
 
   let attempt = 0;
-  let msg = await channel.send({ content: content(attempt), files: slideFiles(dir), components: [buttons(regenLabel)] });
-  setStatus(jobId, 'preview');
+  let msg = resumeMsg;
+  if (!msg) {
+    msg = await channel.send({ content: content(attempt), files: slideFiles(dir), components: [buttons(regenLabel)] });
+    setStatus(jobId, 'preview');
+  }
+  rememberMsg(jobId, msg.id);
 
   for (;;) {
     const press = await msg.awaitMessageComponent({ time: 24 * 3600 * 1000 }).catch(() => null);
-    if (!press) return msg.edit({ components: [buttons(regenLabel, true)] });
+    if (!press) { rememberMsg(jobId, null); return msg.edit({ components: [buttons(regenLabel, true)] }); }
 
-    if (press.customId === 'approve') return publishJob(jobId, dir, brand, channel, press);
+    if (press.customId === 'approve') { rememberMsg(jobId, null); return publishJob(jobId, dir, brand, channel, press); }
 
     if (press.customId === 'cancel') {
+      rememberMsg(jobId, null);
       setStatus(jobId, 'failed', `취소됨 (${press.user.username})`);
       return press.update({ content: `❌ **#${jobId}** — 취소되었습니다.`, components: [] });
     }
 
     attempt++;
     if (attempt > maxRegen) {
+      rememberMsg(jobId, null);
       return press.update({ content: `⛔ **#${jobId}** — 재생성 한도(${maxRegen}회) 도달.`, components: [] });
     }
     await press.update({ content: `🔄 **#${jobId}** — 재생성 중 (${attempt}/${maxRegen})… ${regenWait}`, components: [] });
     try {
       await regen(attempt);
     } catch (e) {
+      rememberMsg(jobId, null);
       setStatus(jobId, 'failed', String(e.message).slice(0, 500));
       return channel.send(`❌ **#${jobId}** — 재생성 실패: ${String(e.message).slice(0, 300)}`);
     }
     msg = await channel.send({ content: content(attempt), files: slideFiles(dir), components: [buttons(regenLabel)] });
+    rememberMsg(jobId, msg.id);
   }
 }
 
@@ -159,17 +172,13 @@ async function notifyFailure(jobId, reason) {
       .slice(0, 2000));
 }
 
-// ---- dipanggil worker: preview + approval untuk job hasil pipeline ----
-async function preview(jobId) {
-  if (!client || !client.isReady()) throw new Error('Discord bot belum siap');
-  const job = db.prepare('SELECT * FROM jobs WHERE id=?').get(jobId);
-  const brand = db.prepare('SELECT * FROM brands WHERE id=?').get(job.brand_id);
-  const channel = await client.channels.fetch(brand.discord_channel_id);
+// argumen approvalLoop per mode — dipisah supaya bisa dipakai ulang saat menyambung
+// preview lama setelah restart (lihat resumePending)
+function pipelineArgs(job, brand, channel) {
   const dir = path.join(OUT, job.post_dir);
   const scope = process.env.REGEN_SCOPE || 'backgrounds';
-
-  await approvalLoop({
-    channel, jobId, brand, dir,
+  return {
+    channel, jobId: job.id, brand, dir,
     title: '미리보기',
     regenLabel: scope === 'full' ? '🔄 전체 재생성' : '🔄 디자인 재생성',
     regenWait: '몇 분 정도 걸려요.',
@@ -186,7 +195,51 @@ async function preview(jobId) {
         env: { ...process.env, TEMPLATE: job.template || brand.template || 'slide.html', BRAND_NAME: brand.name || '', BRAND_HANDLE: brand.handle || '' },
       });
     },
-  });
+  };
+}
+
+function uploadArgs(job, brand, channel) {
+  const dir = path.join(OUT, job.post_dir);
+  const text = job.topic || '';
+  return {
+    channel, jobId: job.id, brand, dir,
+    title: '업로드 미리보기',
+    regenLabel: '🔄 캡션 재생성',
+    regenWait: '1분 정도 걸려요.',
+    maxRegen: 3,
+    regen: () => writeCaption(dir, brand, text + '\n\n(이전 캡션과 다른 각도로 다시 써라)'),
+  };
+}
+
+// ---- dipanggil worker: preview + approval untuk job hasil pipeline ----
+async function preview(jobId) {
+  if (!client || !client.isReady()) throw new Error('Discord bot belum siap');
+  const job = db.prepare('SELECT * FROM jobs WHERE id=?').get(jobId);
+  const brand = db.prepare('SELECT * FROM brands WHERE id=?').get(job.brand_id);
+  const channel = await client.channels.fetch(brand.discord_channel_id);
+  await approvalLoop(pipelineArgs(job, brand, channel));
+}
+
+// ---- dipanggil saat bot siap: sambung lagi tombol preview yang menggantung ----
+// Listener tombol hidup di memori, jadi restart bikin preview lama mati diam-diam
+// ("The application didn't respond in time" saat ditekan).
+async function resumePending() {
+  const rows = db.prepare(`SELECT * FROM jobs WHERE status='preview' AND discord_message_id IS NOT NULL`).all();
+  for (const job of rows) {
+    try {
+      const brand = db.prepare('SELECT * FROM brands WHERE id=?').get(job.brand_id);
+      if (!brand || !brand.discord_channel_id || !job.post_dir) continue;
+      const channel = await client.channels.fetch(brand.discord_channel_id);
+      const msg = await channel.messages.fetch(job.discord_message_id);
+      const args = job.mode === 'discord-upload' ? uploadArgs(job, brand, channel) : pipelineArgs(job, brand, channel);
+      approvalLoop({ ...args, resumeMsg: msg })
+        .catch(e => console.error(`intake: approval #${job.id}:`, e.message));
+      console.log(`intake: tombol preview #${job.id} disambung ulang`);
+    } catch (e) {
+      console.error(`intake: gagal menyambung #${job.id}:`, e.message);
+      rememberMsg(job.id, null);
+    }
+  }
 }
 
 // ---- Mode A: gambar jadi → fit 4:5 → caption → approval ----
@@ -215,12 +268,7 @@ async function handleUpload(message, brand, text, images) {
   await status.delete().catch(() => {});
 
   await approvalLoop({
-    channel: message.channel, jobId, brand, dir,
-    title: '업로드 미리보기',
-    regenLabel: '🔄 캡션 재생성',
-    regenWait: '1분 정도 걸려요.',
-    maxRegen: 3,
-    regen: () => writeCaption(dir, brand, text + '\n\n(이전 캡션과 다른 각도로 다시 써라)'),
+    ...uploadArgs({ id: jobId, post_dir: postDir, topic: text }, brand, message.channel),
   });
 }
 
@@ -269,7 +317,10 @@ function start() {
     console.error('intake:', e);
     m.reply('❌ 처리 중 오류: ' + String(e.message).slice(0, 200)).catch(() => {});
   }));
-  client.once('clientReady', () => console.log(`intake: bot aktif sebagai ${client.user.tag}`));
+  client.once('clientReady', () => {
+    console.log(`intake: bot aktif sebagai ${client.user.tag}`);
+    resumePending().catch(e => console.error('intake resumePending:', e.message));
+  });
   client.login(process.env.DISCORD_BOT_TOKEN).catch(e => console.error('intake login gagal:', e.message));
 }
 
