@@ -11,6 +11,9 @@
 | `last-type.html` | cta | sub(영문 kicker), headline, body, cta | 마무리 + 예약 안내 |
 
 - cover 1장 + body 3–4장 + cta 1장.
+- **사진을 최대한 써라.** 주어진 사진은 전부 한 번씩은 쓰는 것을 기본으로 하고,
+  사진 없는 레이아웃(`body-type`)은 **최대 1장**만 넣어라. `last-type`까지 합쳐도
+  글자만 있는 슬라이드가 2장을 넘으면 안 된다. 사진이 남는데 글자 카드를 채우지 마라.
 - **사진은 자료(materials)에서 골라 써라.** 이 브랜드는 실제 공간 사진이 자료로 주어진다. `cover-space.html`과 `body-space.html`에는 `"background_material": "<파일명>"`을 반드시 넣고, `image_prompt`는 쓰지 마라 — AI로 공간을 지어내면 실제 스튜디오와 달라진다.
 - `body-type.html` / `body-quote.html` / `last-type.html`은 사진을 쓰지 않는다. 두 형식을 섞어서 사진–타이포–사진 흐름을 만들어라.
 

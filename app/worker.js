@@ -30,6 +30,18 @@ function slug(topic) {
   return s || 'post';
 }
 
+// jalankan skrip dan ambil stdout-nya (buat review-photos.js)
+function execOut(cmd, args) {
+  return new Promise((resolve, reject) => {
+    const child = spawn(cmd, args, { cwd: ROOT });
+    let out = '', err = '';
+    child.stdout.on('data', d => out += d);
+    child.stderr.on('data', d => err += d);
+    child.on('error', reject);
+    child.on('close', code => code === 0 ? resolve(out) : reject(new Error((err || out).slice(-300))));
+  });
+}
+
 function spawnLogged(cmd, args, opts, logFile, onLine) {
   return new Promise(resolve => {
     const log = fs.createWriteStream(logFile, { flags: 'a' });
@@ -58,22 +70,35 @@ async function runJob(job) {
   if (!brand.discord_channel_id) {
     return fail(job.id, `브랜드 "${brand.name}"에 Discord 채널 ID가 없습니다. 브랜드 설정에서 채널을 등록하세요.`);
   }
-  // 0. bahan dari Drive dipilih AI tanpa mata manusia — minta pilihan dulu.
-  // Upload manual (web UI / Discord) tidak lewat sini: fotonya sudah dipilih orang.
+  setStatus(job.id, 'generating');
+
+  // 0. bahan Drive disaring dulu: AI membuka tiap foto, menilai, dan hanya yang
+  // paling bagus yang lolos. Tidak ada tahap pilih manual — kalau review gagal,
+  // semua bahan dipakai apa adanya daripada job mati.
   if (job.mode === 'drive' && job.selection !== 'done') {
-    const n = db.prepare('SELECT COUNT(*) c FROM materials WHERE job_id=?').get(job.id).c;
-    if (n > 1) {
+    const mats = db.prepare('SELECT * FROM materials WHERE job_id=?').all(job.id);
+    if (mats.length > 1) {
       try {
-        await require('./intake').selectMaterials(job.id);
-        return; // status jadi 'selecting'; lanjut setelah dipilih di Discord
+        const review = JSON.parse(await execOut('node', [path.join(ROOT, 'scripts', 'review-photos.js'), String(job.id)]));
+        const keep = new Set(review.picks || []);
+        if (keep.size) {
+          const upDir = path.join(__dirname, 'uploads', String(job.id));
+          for (const m of mats) {
+            if (keep.has(m.filename)) continue;
+            fs.rmSync(path.join(upDir, m.filename), { force: true });
+            db.prepare('DELETE FROM materials WHERE id=?').run(m.id);
+          }
+          console.log(`worker: #${job.id} foto disaring ${mats.length} → ${keep.size} (${review.angle || '-'})`);
+          if (review.angle) job.topic = `${job.topic || ''}\n\n## 이번 게시물의 방향\n${review.angle}`.trim();
+        } else {
+          console.error(`worker: #${job.id} tidak ada foto yang lolos review — pakai semua`);
+        }
       } catch (e) {
-        console.error(`worker: minta pilihan foto #${job.id} gagal:`, e.message);
-        // bot mati / channel bermasalah → jangan blokir, lanjut apa adanya
+        console.error(`worker: review foto #${job.id} gagal:`, String(e.message).slice(0, 200));
       }
+      db.prepare("UPDATE jobs SET selection='done' WHERE id=?").run(job.id);
     }
   }
-
-  setStatus(job.id, 'generating');
 
   // 1. post dir + materials copy
   const postDir = job.post_dir || `${now().slice(0, 10)}-${slug(job.topic)}-j${job.id}`;
