@@ -51,6 +51,8 @@
       <div id="ighint" style="font-size:12px;color:var(--faint);margin-top:6px"></div>
       <label for="drive_folder_id">Google Drive 폴더 ID <span style="font-weight:500;color:var(--faint)">이 브랜드 자료가 있는 폴더 — 매일 여기서 가져옵니다</span></label>
       <input type="text" id="drive_folder_id" placeholder="1xE-Krx2INGJqkDo8QrOUndWZTbF6mQUt">
+      <label for="source_urls">참고 링크 <span style="font-weight:500;color:var(--faint)">한 줄에 하나 — 생성할 때마다 여기서 최신 정보를 읽어옵니다</span></label>
+      <textarea id="source_urls" rows="3" placeholder="https://potenstudio.xyz/&#10;https://pcmap.place.naver.com/place/1404460193/home"></textarea>
       <label for="rss_feeds">RSS 피드 <span style="font-weight:500;color:var(--faint)">쉼표로 구분</span></label>
       <input type="text" id="rss_feeds">
       <label>기본 템플릿 <span style="font-weight:500;color:var(--faint)">이 계정의 카드뉴스 디자인 — 자료함에서 게시물별로 바꿀 수 있어요</span></label>
@@ -69,7 +71,7 @@
 </div>
 <script>
 const $ = id => document.getElementById(id);
-const FIELDS = ['name', 'handle', 'discord_channel_id', 'ig_account_id', 'rss_feeds', 'template', 'prompt_rules', 'zernio_api_key', 'drive_folder_id'];
+const FIELDS = ['name', 'handle', 'discord_channel_id', 'ig_account_id', 'rss_feeds', 'template', 'prompt_rules', 'zernio_api_key', 'drive_folder_id', 'source_urls'];
 let brands = [];
 
 // --- Instagram account select (dari Zernio, per brand) ---

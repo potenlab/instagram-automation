@@ -109,7 +109,7 @@ async function runJob(job) {
   };
   const code = await spawnLogged(
     path.join(ROOT, 'scripts', 'generate.sh'), [postDir, topic],
-    { cwd: ROOT, env: { ...process.env, HF_MODEL: process.env.HF_MODEL || '', TEMPLATE: job.template || brand.template || 'slide.html', BRAND_NAME: brand.name || '', BRAND_HANDLE: brand.handle || '' } },
+    { cwd: ROOT, env: { ...process.env, HF_MODEL: process.env.HF_MODEL || '', TEMPLATE: job.template || brand.template || 'slide.html', BRAND_NAME: brand.name || '', BRAND_HANDLE: brand.handle || '', BRAND_ID: String(brand.id) } },
     path.join(dir, 'pipeline.log'),
     line => {
       if (line.startsWith('== claude -p')) stage('copy', '카피 쓰는 중… (보통 1–3분)');

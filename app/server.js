@@ -51,7 +51,7 @@ app.post('/api/login', express.json(), (req, res) => {
 });
 
 // --- brands CRUD ---
-const BRAND_FIELDS = ['name', 'handle', 'discord_channel_id', 'ig_account_id', 'rss_feeds', 'template', 'prompt_rules', 'zernio_api_key', 'drive_folder_id'];
+const BRAND_FIELDS = ['name', 'handle', 'discord_channel_id', 'ig_account_id', 'rss_feeds', 'template', 'prompt_rules', 'zernio_api_key', 'drive_folder_id', 'source_urls'];
 const TEMPLATE_IDX = BRAND_FIELDS.indexOf('template');
 const brandBody = b => BRAND_FIELDS.map(f => String(b[f] ?? ''));
 

@@ -15,13 +15,23 @@ mkdir -p "$DIR/backgrounds"
 if [ ! -f "$DIR/content.json" ]; then
   [ -n "$TOPIC" ] || { echo "content.json belum ada — kasih topik sebagai argumen ke-2"; exit 1; }
   echo "$TOPIC" > "$DIR/topic.txt"   # disimpan supaya approve-bot bisa regen full
+  # referensi brand ditarik langsung dari link-nya (web, Naver) — bukan hafalan prompt.
+  # disimpan per-post supaya regenerate tidak menarik ulang.
+  SRC="$DIR/sources.md"
+  if [ -n "${BRAND_ID:-}" ] && [ ! -f "$SRC" ]; then
+    echo "== ambil referensi dari link brand =="
+    node "$ROOT/scripts/fetch-sources.js" "$BRAND_ID" --out "$SRC" || true
+    [ -s "$SRC" ] && echo "referensi: $(wc -c < "$SRC" | tr -d ' ') karakter" || echo "referensi: tidak ada / gagal"
+  fi
+
   echo "== claude -p: nulis konten =="
   LAYOUT_DOC="$ROOT/prompts/layouts-${TEMPLATE:-}.md"   # family template → layout instructions ikut prompt
   # output claude ditampung dulu: kalau gagal (auth habis, rate limit, dsb) pesannya
   # harus masuk log ini — bukan terkubur di content.json seperti sebelumnya
   RAW="$DIR/claude-raw.txt"
   set +e
-  { cat "$ROOT/prompts/card-news.md"; [ -f "$LAYOUT_DOC" ] && cat "$LAYOUT_DOC"; printf '\n## 주제\n\n%s\n' "$TOPIC"; } \
+  { cat "$ROOT/prompts/card-news.md"; [ -f "$LAYOUT_DOC" ] && cat "$LAYOUT_DOC"; \
+    [ -s "$SRC" ] && cat "$SRC"; printf '\n## 주제\n\n%s\n' "$TOPIC"; } \
     | claude -p --allowedTools WebFetch Read > "$RAW" 2> "$DIR/claude-err.txt"
   RC=$?
   set -e

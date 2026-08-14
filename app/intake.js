@@ -158,10 +158,26 @@ async function selectMaterials(jobId) {
   const dir = path.join(UPLOADS, String(jobId));
   const files = mats.map(m => path.join(dir, m.filename)).filter(f => fs.existsSync(f));
 
-  const options = mats.slice(0, 25).map((m, i) => ({
-    label: `${i + 1}. ${m.filename}`.slice(0, 100),
-    value: String(m.id),
-  }));
+  // AI membuka tiap foto dan menilainya dulu; rekomendasinya jadi centang awal
+  let review = { angle: '', photos: [], picks: [] };
+  try {
+    review = JSON.parse(await run('node', [path.join(ROOT, 'scripts', 'review-photos.js'), String(jobId)]));
+  } catch (e) {
+    console.error(`intake: review foto #${jobId} gagal:`, String(e.message).slice(0, 200));
+  }
+  const verdictOf = f => (review.photos.find(p => path.basename(String(p.file)) === f) || {});
+  const picked = new Set(review.picks || []);
+  const mark = { good: '⭐', ok: '·', bad: '✕' };
+
+  const options = mats.slice(0, 25).map((m, i) => {
+    const v = verdictOf(m.filename);
+    return {
+      label: `${i + 1}. ${m.filename}`.slice(0, 100),
+      description: (v.reason || '').slice(0, 100) || undefined,
+      value: String(m.id),
+      default: picked.has(m.filename),
+    };
+  });
   const menu = new StringSelectMenuBuilder()
     .setCustomId('pick')
     .setPlaceholder('게시물에 쓸 사진을 고르세요 (여러 장 가능)')
@@ -169,11 +185,19 @@ async function selectMaterials(jobId) {
     .setMaxValues(Math.min(options.length, 10))
     .addOptions(options);
 
+  const list = mats.map((m, i) => {
+    const v = verdictOf(m.filename);
+    const star = picked.has(m.filename) ? '**' : '';
+    return `${mark[v.verdict] || '·'} ${star}${i + 1}. ${m.filename}${star}`
+      + (v.reason ? ` — ${v.reason}` : '');
+  }).join('\n');
+
   const msg = await channel.send({
     content: `🖼️ **#${jobId} ${brand.name}** — 사진 선택\n`
-      + `자료 ${mats.length}장을 가져왔어요. 게시물에 쓸 사진만 골라주세요.\n`
-      + `고른 사진만 남기고 나머지는 버린 뒤 카드뉴스를 만듭니다.\n`
-      + mats.map((m, i) => `${i + 1}. ${m.filename}`).join('\n').slice(0, 1200),
+      + (review.angle ? `\n**제안 방향:** ${review.angle}\n` : '')
+      + `\n자료 ${mats.length}장을 AI가 직접 열어보고 판정했어요`
+      + (picked.size ? ` — **${picked.size}장 추천** (아래에 미리 체크됨)` : ' — 추천할 만한 사진이 없어요')
+      + `:\n${list}\n\n고른 사진만 남기고 나머지는 버립니다.`.slice(0, 1600),
     files: files.slice(0, 10),
     components: [
       new ActionRowBuilder().addComponents(menu),
@@ -267,7 +291,7 @@ function pipelineArgs(job, brand, channel) {
       for (const f of del) fs.rmSync(path.join(dir, f), { force: true });
       fs.rmSync(path.join(dir, 'backgrounds'), { recursive: true, force: true });
       await run(path.join(ROOT, 'scripts', 'generate.sh'), [job.post_dir, topic], {
-        env: { ...process.env, TEMPLATE: job.template || brand.template || 'slide.html', BRAND_NAME: brand.name || '', BRAND_HANDLE: brand.handle || '' },
+        env: { ...process.env, TEMPLATE: job.template || brand.template || 'slide.html', BRAND_NAME: brand.name || '', BRAND_HANDLE: brand.handle || '', BRAND_ID: String(brand.id) },
       });
     },
   };
