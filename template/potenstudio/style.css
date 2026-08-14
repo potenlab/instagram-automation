@@ -1,0 +1,115 @@
+/* Potenstudio family — meniru gaya feed Instagram @potenstudio_ yang sudah ada.
+   Dua gaya, diukur langsung dari post mereka:
+   A. Foto ruangan full-bleed + scrim gelap + judul serif kapital di tengah
+   B. Kartu tipografi latar #F1F1F1 dengan teks hitam */
+:root {
+  --paper: #F1F1F1;      /* diukur dari post tipografi mereka */
+  --ink: #000000;
+  --ink-soft: #4A4A4A;
+  --serif: 'Playfair Display', 'Noto Serif KR', 'Nanum Myeongjo', serif;
+  --sans: 'Pretendard Variable', Pretendard, 'Noto Sans KR', sans-serif;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html, body { width: 1080px; height: 1350px; }
+body {
+  font-family: var(--serif);
+  overflow: hidden;
+  position: relative;
+  word-break: keep-all;
+  background: #1a1a1a;
+}
+
+/* ---------- Gaya A: foto + scrim + judul tengah ---------- */
+.space { position: relative; }
+.space .bg {
+  position: absolute; inset: 0;
+  background: #2a2a2a center/cover no-repeat;
+}
+/* scrim: rata di tengah supaya teks terbaca, sedikit lebih gelap di tepi
+   — fotonya tetap terlihat jelas, seperti post mereka */
+.space .bg::after {
+  content: ''; position: absolute; inset: 0;
+  background:
+    linear-gradient(180deg, rgba(0,0,0,.42) 0%, rgba(0,0,0,.30) 38%, rgba(0,0,0,.30) 62%, rgba(0,0,0,.52) 100%);
+}
+.space .frame {
+  position: absolute; inset: 0;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  padding: 0 96px; text-align: center;
+}
+.space .title {
+  font-size: 84px; font-weight: 700; color: #fff;
+  letter-spacing: .085em; line-height: 1.22; text-transform: uppercase;
+  white-space: pre-line;
+  text-shadow: 0 2px 26px rgba(0,0,0,.55);
+}
+.space .title .hl { color: #fff; font-style: italic; }
+.space .sign {
+  margin-top: 26px; font-size: 34px; font-style: italic; font-weight: 400;
+  color: rgba(255,255,255,.92); letter-spacing: .04em;
+  text-shadow: 0 2px 18px rgba(0,0,0,.5);
+}
+/* varian body: judul lebih kecil, ada satu paragraf di bawah */
+.space.with-body .title { font-size: 64px; }
+.space .body {
+  margin-top: 34px; max-width: 800px;
+  font-family: var(--sans); font-size: 30px; font-weight: 500; line-height: 1.62;
+  color: rgba(255,255,255,.94); white-space: pre-line;
+  text-shadow: 0 2px 16px rgba(0,0,0,.55);
+}
+.space .caps {
+  position: absolute; top: 74px; left: 0; right: 0; text-align: center;
+  font-family: var(--sans); font-size: 22px; font-weight: 600;
+  letter-spacing: .34em; text-transform: uppercase; color: rgba(255,255,255,.82);
+}
+
+/* ---------- Gaya B: kartu tipografi ---------- */
+.type {
+  background: var(--paper); color: var(--ink);
+  padding: 110px 96px; display: flex; flex-direction: column;
+}
+.type .kicker {
+  font-family: var(--sans); font-size: 22px; font-weight: 700;
+  letter-spacing: .3em; text-transform: uppercase; color: var(--ink);
+}
+.type .title {
+  margin-top: auto; font-size: 86px; font-weight: 900; line-height: 1.16;
+  letter-spacing: -.015em; white-space: pre-line;
+}
+.type .title .hl { font-style: italic; font-weight: 700; }
+.type .body {
+  font-family: var(--sans); font-size: 31px; font-weight: 500; line-height: 1.66;
+  color: var(--ink-soft); margin-top: 34px; white-space: pre-line;
+}
+.type .rule { width: 100%; height: 2px; background: var(--ink); margin: 46px 0 0; }
+.type .sign {
+  margin-top: auto; padding-top: 40px; display: flex; justify-content: space-between;
+  align-items: baseline; font-size: 28px; font-style: italic;
+}
+.type .sign .tag {
+  font-family: var(--sans); font-style: normal; font-size: 24px; font-weight: 700;
+  letter-spacing: .04em;
+}
+
+/* pill hitam & outline — meniru "LIMIT" / "CREATIVE" di banner mereka */
+.pill {
+  display: inline-block; padding: 6px 26px; border-radius: 999px;
+  font-family: var(--sans); font-size: .62em; font-weight: 800;
+  letter-spacing: .06em; vertical-align: middle;
+}
+.pill.solid { background: var(--ink); color: var(--paper); }
+.pill.line { border: 3px solid var(--ink); color: var(--ink); }
+
+/* ---------- kutipan review ---------- */
+.quote { background: var(--paper); color: var(--ink); padding: 120px 96px; display: flex; flex-direction: column; }
+.quote .mark { font-size: 150px; font-weight: 900; line-height: .7; margin-top: auto; }
+.quote .text {
+  margin-top: 30px; margin-bottom: auto; font-size: 52px; font-weight: 400; line-height: 1.45;
+  white-space: pre-line;
+}
+.quote .text .hl { font-style: italic; }
+.quote .who {
+  margin-top: auto; font-family: var(--sans); font-size: 27px; font-weight: 600;
+  color: var(--ink-soft); letter-spacing: .02em;
+}

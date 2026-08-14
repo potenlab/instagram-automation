@@ -1,0 +1,4 @@
+{
+  "name": "포텐스튜디오 (기존 피드)",
+  "defaults": { "cover": "cover-space.html", "body": "body-space.html", "cta": "last-type.html" }
+}
