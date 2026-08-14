@@ -134,6 +134,22 @@ db.exec(`CREATE TABLE IF NOT EXISTS meta (k TEXT PRIMARY KEY, v TEXT)`);
 const getMeta = k => (db.prepare('SELECT v FROM meta WHERE k=?').get(k) || {}).v;
 const setMeta = (k, v) => db.prepare('INSERT INTO meta(k,v) VALUES(?,?) ON CONFLICT(k) DO UPDATE SET v=excluded.v').run(k, v);
 
+// Tarik bahan Drive jadi job 'stock' baru. Resolve true kalau ada yang masuk.
+function pullDrive(brandId) {
+  return new Promise(resolve => {
+    const child = spawn('node', [path.join(ROOT, 'scripts', 'drive-pull.js'), String(brandId)], { cwd: ROOT });
+    let out = '';
+    child.stdout.on('data', d => out += d);
+    child.stderr.on('data', d => out += d);
+    child.on('close', code => {
+      if (code === 0 && /job #\d+ dibuat/.test(out)) return resolve(true);
+      if (!/tidak ada bahan baru/.test(out)) console.error(`daily: drive-pull brand ${brandId}:`, out.trim().slice(-200));
+      resolve(false);
+    });
+    child.on('error', e => { console.error('daily: drive-pull:', e.message); resolve(false); });
+  });
+}
+
 function fetchRssTopic(feeds) {
   return new Promise(resolve => {
     const child = spawn('node', [path.join(ROOT, 'scripts', 'fetch-news.js')], {
@@ -157,10 +173,17 @@ async function dailyTrigger() {
   setMeta('last_daily', today);
   const ts = new Date().toISOString();
   for (const b of db.prepare('SELECT * FROM brands').all()) {
-    const stock = db.prepare(`SELECT id FROM jobs WHERE brand_id=? AND status='stock' ORDER BY id LIMIT 1`).get(b.id);
+    // stok manual dulu; habis → tarik bahan Drive; habis juga → RSS
+    let stock = db.prepare(`SELECT id FROM jobs WHERE brand_id=? AND status='stock' ORDER BY id LIMIT 1`).get(b.id);
+    if (!stock && String(b.drive_folder_id || '').trim()) {
+      if (await pullDrive(b.id)) {
+        stock = db.prepare(`SELECT id FROM jobs WHERE brand_id=? AND status='stock' ORDER BY id LIMIT 1`).get(b.id);
+        if (stock) console.log(`daily: brand ${b.name} → job #${stock.id} dari Google Drive`);
+      }
+    }
     if (stock) {
       db.prepare(`UPDATE jobs SET status='queued', updated_at=? WHERE id=?`).run(ts, stock.id);
-      console.log(`daily: brand ${b.name} → job #${stock.id} dari stok`);
+      console.log(`daily: brand ${b.name} → job #${stock.id} dijalankan`);
     } else if (b.rss_feeds && b.rss_feeds.trim()) {
       const pick = await fetchRssTopic(b.rss_feeds.trim());
       if (!pick) { console.error(`daily: brand ${b.name} — RSS kosong/gagal`); continue; }

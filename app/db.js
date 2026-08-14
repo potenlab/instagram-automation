@@ -46,6 +46,20 @@ try { db.exec('ALTER TABLE jobs ADD COLUMN template TEXT'); } catch {}
 // yang berbeda, jadi key-nya per brand. Kosong = pakai ZERNIO_API_KEY dari 설정.
 try { db.exec('ALTER TABLE brands ADD COLUMN zernio_api_key TEXT'); } catch {}
 
+// migrasi ringan: brands.drive_folder_id — folder Google Drive per brand.
+// Isinya jadi bahan otomatis; kosong = fitur mati untuk brand itu.
+try { db.exec('ALTER TABLE brands ADD COLUMN drive_folder_id TEXT'); } catch {}
+
+// File Drive yang sudah pernah dipakai, supaya tidak diambil berulang tiap hari.
+db.exec(`CREATE TABLE IF NOT EXISTS drive_seen(
+  brand_id INTEGER,
+  file_id TEXT,
+  name TEXT,
+  job_id INTEGER,
+  seen_at TEXT,
+  PRIMARY KEY (brand_id, file_id)
+)`);
+
 // seed sekali saja kalau brands kosong
 if (db.prepare('SELECT COUNT(*) AS c FROM brands').get().c === 0) {
   let channel = '';
