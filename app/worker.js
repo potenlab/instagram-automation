@@ -30,18 +30,6 @@ function slug(topic) {
   return s || 'post';
 }
 
-// jalankan skrip dan ambil stdout-nya (buat review-photos.js)
-function execOut(cmd, args) {
-  return new Promise((resolve, reject) => {
-    const child = spawn(cmd, args, { cwd: ROOT });
-    let out = '', err = '';
-    child.stdout.on('data', d => out += d);
-    child.stderr.on('data', d => err += d);
-    child.on('error', reject);
-    child.on('close', code => code === 0 ? resolve(out) : reject(new Error((err || out).slice(-300))));
-  });
-}
-
 function spawnLogged(cmd, args, opts, logFile, onLine) {
   return new Promise(resolve => {
     const log = fs.createWriteStream(logFile, { flags: 'a' });
@@ -72,31 +60,21 @@ async function runJob(job) {
   }
   setStatus(job.id, 'generating');
 
-  // 0. bahan Drive disaring dulu: AI membuka tiap foto, menilai, dan hanya yang
-  // paling bagus yang lolos. Tidak ada tahap pilih manual — kalau review gagal,
-  // semua bahan dipakai apa adanya daripada job mati.
+  // 0. kandidat planner ditawarkan dulu di Discord — manusia yang memutuskan foto
+  // mana yang dipakai (permintaan Minjae). Upload manual tidak lewat sini:
+  // fotonya sudah dipilih orang.
   if (job.mode === 'drive' && job.selection !== 'done') {
-    const mats = db.prepare('SELECT * FROM materials WHERE job_id=?').all(job.id);
-    if (mats.length > 1) {
+    const n = db.prepare('SELECT COUNT(*) c FROM materials WHERE job_id=?').get(job.id).c;
+    if (n > 1) {
       try {
-        const review = JSON.parse(await execOut('node', [path.join(ROOT, 'scripts', 'review-photos.js'), String(job.id)]));
-        const keep = new Set(review.picks || []);
-        if (keep.size) {
-          const upDir = path.join(__dirname, 'uploads', String(job.id));
-          for (const m of mats) {
-            if (keep.has(m.filename)) continue;
-            fs.rmSync(path.join(upDir, m.filename), { force: true });
-            db.prepare('DELETE FROM materials WHERE id=?').run(m.id);
-          }
-          console.log(`worker: #${job.id} foto disaring ${mats.length} → ${keep.size} (${review.angle || '-'})`);
-          if (review.angle) job.topic = `${job.topic || ''}\n\n## 이번 게시물의 방향\n${review.angle}`.trim();
-        } else {
-          console.error(`worker: #${job.id} tidak ada foto yang lolos review — pakai semua`);
-        }
+        await require('./intake').selectMaterials(job.id);
+        return; // status jadi 'selecting'; lanjut setelah dipilih di Discord
       } catch (e) {
-        console.error(`worker: review foto #${job.id} gagal:`, String(e.message).slice(0, 200));
+        console.error(`worker: minta pilihan foto #${job.id} gagal:`, e.message);
+        // bot masih connect (baru restart) → kembalikan ke antrean, coba lagi tick berikutnya
+        if (/belum siap/.test(e.message)) { setStatus(job.id, 'queued'); return; }
+        // channel bermasalah → jangan blokir, lanjut apa adanya
       }
-      db.prepare("UPDATE jobs SET selection='done' WHERE id=?").run(job.id);
     }
   }
 
@@ -114,6 +92,11 @@ async function runJob(job) {
     }
   }
 
+  // gate: brand dengan folder Drive wajib punya foto — post tanpa foto tidak boleh jalan
+  if (String(brand.drive_folder_id || '').trim() && !mats.length) {
+    return fail(job.id, '사진 자료가 없습니다. 모든 게시물은 Google Drive 사진으로 만듭니다 — 폴더에 사진을 넣거나 자료함에서 업로드하세요.');
+  }
+
   // 2. TOPIC string — topik kosong: AI tentukan sendiri dari materi
   let topic = job.topic || '주제가 지정되지 않았다. 아래 자료 이미지를 보고 어울리는 주제를 정해서 카드뉴스를 만들어라.';
   if (brand.prompt_rules) topic += '\n\n## 브랜드 규칙\n' + brand.prompt_rules;
@@ -121,6 +104,29 @@ async function runJob(job) {
     topic += '\n\n## 자료 (materials)\n';
     for (const m of mats) topic += `- out/${postDir}/materials/${m.filename} — ${m.note || ''}\n`;
     topic += '자료 이미지가 슬라이드 배경으로 적합하면 해당 slide에 "background_material": "<filename>" 필드를 넣어라. Read 도구로 자료 이미지를 먼저 봐라.';
+  }
+
+  // mode yt-single: poster 1 slide dari thumbnail via GPT Image — bukan card news
+  if (job.mode === 'yt-single') {
+    fs.writeFileSync(path.join(dir, 'topic.txt'), topic);
+    Promise.resolve().then(() => require('./intake').notifyStage(job.id, '유튜브 포스터 만드는 중… (2–4분)'))
+      .catch(e => console.error('worker notifyStage:', e.message));
+    const code = await spawnLogged('node', [path.join(ROOT, 'scripts', 'yt-single-gen.js'), dir],
+      { cwd: ROOT, env: { ...process.env, BRAND_NAME: brand.name || '', BRAND_HANDLE: brand.handle || '' } },
+      path.join(dir, 'pipeline.log'));
+    if (code !== 0) {
+      let tail = '';
+      try { tail = fs.readFileSync(path.join(dir, 'pipeline.log'), 'utf8').slice(-500); } catch {}
+      return fail(job.id, tail || `yt-single-gen exit ${code}`);
+    }
+    setStatus(job.id, 'preview');
+    require('./intake').preview(job.id).catch(e => {
+      console.error('worker preview:', e.message);
+      fs.appendFileSync(path.join(dir, 'approve.log'), 'preview gagal: ' + e.message + '\n');
+      // bot masih connect (baru restart) → antre lagi; generate idempotent, langsung preview
+      if (/belum siap/.test(e.message)) setStatus(job.id, 'queued');
+    });
+    return;
   }
 
   // 3. generate.sh — tiap tahap dikabari ke channel (sekali per tahap, maks 3 pesan)
@@ -153,6 +159,8 @@ async function runJob(job) {
   require('./intake').preview(job.id).catch(e => {
     console.error('worker preview:', e.message);
     fs.appendFileSync(path.join(dir, 'approve.log'), 'preview gagal: ' + e.message + '\n');
+    // bot masih connect (baru restart) → antre lagi; generate idempotent, langsung preview
+    if (/belum siap/.test(e.message)) setStatus(job.id, 'queued');
   });
 }
 
@@ -174,19 +182,20 @@ db.exec(`CREATE TABLE IF NOT EXISTS meta (k TEXT PRIMARY KEY, v TEXT)`);
 const getMeta = k => (db.prepare('SELECT v FROM meta WHERE k=?').get(k) || {}).v;
 const setMeta = (k, v) => db.prepare('INSERT INTO meta(k,v) VALUES(?,?) ON CONFLICT(k) DO UPDATE SET v=excluded.v').run(k, v);
 
-// Tarik bahan Drive jadi job 'stock' baru. Resolve true kalau ada yang masuk.
-function pullDrive(brandId) {
+// Jalankan skrip pembuat job (plan-post.js / yt-pull.js). Resolve true kalau
+// job baru dibuat.
+function runScript(script, brandId) {
   return new Promise(resolve => {
-    const child = spawn('node', [path.join(ROOT, 'scripts', 'drive-pull.js'), String(brandId)], { cwd: ROOT });
+    const child = spawn('node', [path.join(ROOT, 'scripts', script), String(brandId)], { cwd: ROOT });
     let out = '';
     child.stdout.on('data', d => out += d);
     child.stderr.on('data', d => out += d);
     child.on('close', code => {
       if (code === 0 && /job #\d+ dibuat/.test(out)) return resolve(true);
-      if (!/tidak ada bahan baru/.test(out)) console.error(`daily: drive-pull brand ${brandId}:`, out.trim().slice(-200));
+      console.error(`daily: ${script} brand ${brandId}:`, out.trim().slice(-300));
       resolve(false);
     });
-    child.on('error', e => { console.error('daily: drive-pull:', e.message); resolve(false); });
+    child.on('error', e => { console.error(`daily: ${script}:`, e.message); resolve(false); });
   });
 }
 
@@ -213,10 +222,16 @@ async function dailyTrigger() {
   setMeta('last_daily', today);
   const ts = new Date().toISOString();
   for (const b of db.prepare('SELECT * FROM brands').all()) {
-    // stok manual dulu; habis → tarik bahan Drive; habis juga → RSS
+    // stok manual dulu; habis → video YouTube yang belum dipakai; habis → Drive; habis → RSS
     let stock = db.prepare(`SELECT id FROM jobs WHERE brand_id=? AND status='stock' ORDER BY id LIMIT 1`).get(b.id);
+    if (!stock && String(b.yt_urls || '').trim()) {
+      if (await runScript('yt-pull.js', b.id)) {
+        stock = db.prepare(`SELECT id FROM jobs WHERE brand_id=? AND status='stock' ORDER BY id LIMIT 1`).get(b.id);
+        if (stock) console.log(`daily: brand ${b.name} → job #${stock.id} dari YouTube`);
+      }
+    }
     if (!stock && String(b.drive_folder_id || '').trim()) {
-      if (await pullDrive(b.id)) {
+      if (await runScript('plan-post.js', b.id)) {
         stock = db.prepare(`SELECT id FROM jobs WHERE brand_id=? AND status='stock' ORDER BY id LIMIT 1`).get(b.id);
         if (stock) console.log(`daily: brand ${b.name} → job #${stock.id} dari Google Drive`);
       }

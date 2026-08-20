@@ -54,6 +54,10 @@ try { db.exec('ALTER TABLE brands ADD COLUMN drive_folder_id TEXT'); } catch {}
 // Diambil ulang tiap generate supaya fakta selalu terbaru, bukan hafalan prompt.
 try { db.exec('ALTER TABLE brands ADD COLUMN source_urls TEXT'); } catch {}
 
+// migrasi ringan: brands.yt_urls — daftar link YouTube brand (satu per baris).
+// Video diperlakukan seperti foto Drive: frame jadi kandidat, 자막 jadi referensi.
+try { db.exec('ALTER TABLE brands ADD COLUMN yt_urls TEXT'); } catch {}
+
 // migrasi ringan: jobs.selection — tahap pilih foto sebelum generate.
 // null = belum ditawarkan, 'pending' = menunggu pilihan di Discord, 'done' = sudah dipilih.
 try { db.exec('ALTER TABLE jobs ADD COLUMN selection TEXT'); } catch {}

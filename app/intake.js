@@ -158,12 +158,22 @@ async function selectMaterials(jobId) {
   const dir = path.join(UPLOADS, String(jobId));
   const files = mats.map(m => path.join(dir, m.filename)).filter(f => fs.existsSync(f));
 
-  // AI membuka tiap foto dan menilainya dulu; rekomendasinya jadi centang awal
+  // Kandidat dari planner (plan-post.js) sudah dinilai dan diberi memo — pakai
+  // memonya langsung. Bahan tanpa memo (drive-pull lama) baru direview AI di sini.
   let review = { angle: '', photos: [], picks: [] };
-  try {
-    review = JSON.parse(await run('node', [path.join(ROOT, 'scripts', 'review-photos.js'), String(jobId)]));
-  } catch (e) {
-    console.error(`intake: review foto #${jobId} gagal:`, String(e.message).slice(0, 200));
+  const planned = mats.every(m => (m.note || '').trim() && m.note !== 'Google Drive');
+  if (planned) {
+    review = {
+      angle: String(job.topic || '').split('\n')[0],
+      photos: mats.map(m => ({ file: m.filename, verdict: 'good', reason: m.note })),
+      picks: mats.map(m => m.filename),
+    };
+  } else {
+    try {
+      review = JSON.parse(await run('node', [path.join(ROOT, 'scripts', 'review-photos.js'), String(jobId)]));
+    } catch (e) {
+      console.error(`intake: review foto #${jobId} gagal:`, String(e.message).slice(0, 200));
+    }
   }
   const verdictOf = f => (review.photos.find(p => path.basename(String(p.file)) === f) || {});
   const picked = new Set(review.picks || []);
@@ -310,13 +320,38 @@ function uploadArgs(job, brand, channel) {
   };
 }
 
+// poster tunggal dari video YouTube — regen bikin gambar baru dari thumbnail
+function ytSingleArgs(job, brand, channel) {
+  const dir = path.join(OUT, job.post_dir);
+  return {
+    channel, jobId: job.id, brand, dir,
+    title: '유튜브 포스터 미리보기',
+    regenLabel: '🔄 포스터 재생성',
+    regenWait: '2–4분 정도 걸려요.',
+    maxRegen: parseInt(process.env.REGEN_MAX || '3', 10),
+    regen: async () => {
+      for (const f of ['slide-1.png', 'caption.txt', 'job-image.json']) fs.rmSync(path.join(dir, f), { force: true });
+      fs.rmSync(path.join(dir, 'raw'), { recursive: true, force: true });
+      await run('node', [path.join(ROOT, 'scripts', 'yt-single-gen.js'), dir],
+        { env: { ...process.env, BRAND_NAME: brand.name || '', BRAND_HANDLE: brand.handle || '' } });
+    },
+  };
+}
+
+// argumen approvalLoop sesuai mode job
+function argsFor(job, brand, channel) {
+  if (job.mode === 'discord-upload') return uploadArgs(job, brand, channel);
+  if (job.mode === 'yt-single') return ytSingleArgs(job, brand, channel);
+  return pipelineArgs(job, brand, channel);
+}
+
 // ---- dipanggil worker: preview + approval untuk job hasil pipeline ----
 async function preview(jobId) {
   if (!client || !client.isReady()) throw new Error('Discord bot belum siap');
   const job = db.prepare('SELECT * FROM jobs WHERE id=?').get(jobId);
   const brand = db.prepare('SELECT * FROM brands WHERE id=?').get(job.brand_id);
   const channel = await client.channels.fetch(brand.discord_channel_id);
-  await approvalLoop(pipelineArgs(job, brand, channel));
+  await approvalLoop(argsFor(job, brand, channel));
 }
 
 // ---- dipanggil saat bot siap: sambung lagi tombol preview yang menggantung ----
@@ -336,7 +371,7 @@ async function resumePending() {
         console.log(`intake: pilihan foto #${job.id} disambung ulang`);
         continue;
       }
-      const args = job.mode === 'discord-upload' ? uploadArgs(job, brand, channel) : pipelineArgs(job, brand, channel);
+      const args = argsFor(job, brand, channel);
       approvalLoop({ ...args, resumeMsg: msg })
         .catch(e => console.error(`intake: approval #${job.id}:`, e.message));
       console.log(`intake: tombol preview #${job.id} disambung ulang`);
