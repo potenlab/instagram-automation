@@ -15,7 +15,7 @@ const isFamily = !tplName.endsWith('.html');
 
 const esc = s => (s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 // **word** → highlight span
-const hl = s => esc(s).replace(/\*\*(.+?)\*\*/g, '<span class="hl">$1</span>');
+const hl = s => esc(s).replace(/\*{1,2}([^*]+?)\*{1,2}/g, '<span class="hl">$1</span>');
 
 function logoBlock() {
   return content.brand && content.brand.logo
@@ -43,7 +43,7 @@ function slideData(s, i, total) {
     cta: esc(s.cta || '팔로우하고 소식받기'),
     tip: esc(s.tip),
     q: esc(s.q),
-    note_hand: esc(s.note_hand),
+    note_hand: hl(s.note_hand),
     emoji: esc(s.emoji || '🫶'),
     // avatar: brand logo kalau ada; kosong → CSS gradient fallback (inline url('') akan menimpanya)
     avatar_style: content.brand && content.brand.logo

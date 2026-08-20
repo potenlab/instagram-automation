@@ -4,11 +4,19 @@
 
 | layout | 역할 | 필요한 필드 | 언제 쓰나 |
 |---|---|---|---|
-| `cover-space.html` | cover | badge(영문 짧은 라벨), headline(**영문 대문자 2–3단어**), background_material | 공간 사진 위 큰 세리프 타이틀. 기존 피드의 대표 형식 |
-| `body-space.html` | body | headline(한국어 2줄), body(2문장), background_material | 사진 위 설명 |
-| `body-type.html` | body | sub(영문 kicker), headline(한국어), body | 사진 없이 타이포만 — 밝은 배경(#F1F1F1) |
-| `body-quote.html` | body | headline(후기 원문 그대로), source(후기에 적힌 작성자 표기) | **실제 후기가 주어졌을 때만** |
-| `last-type.html` | cta | sub(영문 kicker), headline, body, cta | 마무리 + 예약 안내 |
+| `cover-space.html` | cover | badge(영문 짧은 라벨 — 스티커 배지로 붙는다), headline(**영문 대문자 2–3단어**), note_hand, background_material | 공간 사진 위 큰 세리프 타이틀. 기존 피드의 대표 형식 |
+| `body-space.html` | body | headline(한국어 2줄), body(2문장 — 기울어진 메모 카드에 올라간다), note_hand, background_material | 사진 + 메모 카드 |
+| `body-type.html` | body | sub(**영문 대문자 한 단어** — 배지에 들어간다, 예: CREATIVE, SPACE), headline(한국어), body, note_hand | "poten STUDIO" 배너 아래 내용 — 밝은 배경(#F1F1F1) |
+| `body-quote.html` | body | headline(후기 원문 그대로 — 손글씨로 렌더링된다), source(후기에 적힌 작성자 표기) | **실제 후기가 주어졌을 때만** |
+| `last-type.html` | cta | sub(**영문 대문자 한 단어** — "WITHOUT ___" 배지, 예: LIMIT), headline, body, cta(손글씨 한 줄로 렌더링) | 큰 "poten STUDIO" 배너 + 마무리·예약 안내 |
+
+### note_hand — 손글씨 메모 (거의 모든 슬라이드에 넣어라)
+
+`note_hand`는 운영자가 사진 위에 직접 갈겨쓴 듯한 **짧은 손글씨 한 줄**이다 (손글씨 폰트로 렌더링된다).
+- 톤: 혼잣말·진심 코멘트. 광고 문구 금지. 예: `여기 진짜 아늑해요`, `조명 맛집…`, `우리 팀 최애 공간`, `보드게임 40종 실화`
+- 길이: 4–14자. 문장부호는 `…`, `!` 정도만. 이모지 금지.
+- cover는 사진 분위기에 대한 감탄 한 줄, body는 그 슬라이드 내용에 대한 사족 한 줄.
+- 강조하고 싶은 단어는 `**별표**`로 감싸면 밑줄 낙서가 붙는다 (cover에서만).
 
 - cover 1장 + body 3–4장 + cta 1장.
 - **사진을 최대한 써라.** 주어진 사진은 전부 한 번씩은 쓰는 것을 기본으로 하고,

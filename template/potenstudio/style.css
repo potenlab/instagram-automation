@@ -1,13 +1,16 @@
-/* Potenstudio family — meniru gaya feed Instagram @potenstudio_ yang sudah ada.
-   Dua gaya, diukur langsung dari post mereka:
-   A. Foto ruangan full-bleed + scrim gelap + judul serif kapital di tengah
-   B. Kartu tipografi latar #F1F1F1 dengan teks hitam */
+/* Potenstudio family — identitas feed @potenstudio_ (foto film + serif kapital +
+   kartu tipografi #F1F1F1), ditambah lapisan "content creator": catatan tulisan
+   tangan, sticker pill/chip, potongan selotip, semua sedikit miring supaya
+   terasa ditempel manual, bukan template. */
 :root {
   --paper: #F1F1F1;      /* diukur dari post tipografi mereka */
   --ink: #000000;
   --ink-soft: #4A4A4A;
   --serif: 'Playfair Display', 'Noto Serif KR', 'Nanum Myeongjo', serif;
   --sans: 'Pretendard Variable', Pretendard, 'Noto Sans KR', sans-serif;
+  --hand: 'Nanum Pen Script', 'Gaegu', cursive;
+  --script: 'Lobster', cursive;          /* "poten" script di banner mereka */
+  --caps: 'Anton', 'Archivo Black', sans-serif; /* "STUDIO" caps berat */
 }
 
 * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -19,6 +22,44 @@ body {
   word-break: keep-all;
   background: #1a1a1a;
 }
+
+/* ---------- elemen "ditempel" (dipakai lintas layout) ---------- */
+/* selotip semi transparan di ujung kartu/catatan */
+.tape {
+  position: absolute; width: 150px; height: 44px;
+  background: rgba(255,255,255,.5);
+  box-shadow: 0 1px 4px rgba(0,0,0,.18);
+  transform: rotate(-5deg);
+}
+.tape.right { transform: rotate(6deg); }
+
+/* catatan tulisan tangan di atas foto */
+.hand-note {
+  font-family: var(--hand); font-weight: 400;
+  color: #fff; font-size: 52px; line-height: 1.25;
+  text-shadow: 0 2px 14px rgba(0,0,0,.6);
+  transform: rotate(-3deg);
+  white-space: pre-line;
+}
+/* coretan garis bawah ala marker */
+.hand-note .hl {
+  font-style: normal;
+  background: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='120' height='14' viewBox='0 0 120 14'><path d='M3 10 C 30 4, 60 12, 117 6' stroke='white' stroke-width='4' fill='none' stroke-linecap='round'/></svg>") no-repeat bottom/100% 12px;
+  padding-bottom: 12px;
+}
+
+/* pill hitam & outline — meniru "LIMIT" / "CREATIVE" di banner mereka,
+   dipakai sebagai sticker (sedikit miring) */
+.pill {
+  display: inline-block; padding: 8px 30px; border-radius: 999px;
+  font-family: var(--sans); font-size: 26px; font-weight: 800;
+  letter-spacing: .06em; vertical-align: middle;
+}
+.pill.solid { background: var(--ink); color: var(--paper); }
+.pill.line { border: 3px solid var(--ink); color: var(--ink); }
+.pill.ghost { border: 3px solid rgba(255,255,255,.9); color: #fff; }
+.sticker { transform: rotate(-4deg); display: inline-block; }
+.sticker.r { transform: rotate(3deg); }
 
 /* ---------- Gaya A: foto + scrim + judul tengah ---------- */
 .space { position: relative; }
@@ -38,31 +79,73 @@ body {
   display: flex; flex-direction: column; align-items: center; justify-content: center;
   padding: 0 96px; text-align: center;
 }
+/* judul feed asli: serif tipis, tracking kecil, tidak bold */
 .space .title {
-  font-size: 84px; font-weight: 700; color: #fff;
-  letter-spacing: .085em; line-height: 1.22; text-transform: uppercase;
+  font-size: 76px; font-weight: 500; color: #fff;
+  letter-spacing: .05em; line-height: 1.22; text-transform: uppercase;
   white-space: pre-line;
   text-shadow: 0 2px 26px rgba(0,0,0,.55);
 }
 .space .title .hl { color: #fff; font-style: italic; }
 .space .sign {
-  margin-top: 26px; font-size: 34px; font-style: italic; font-weight: 400;
+  margin-top: 20px; font-size: 28px; font-style: italic; font-weight: 400;
   color: rgba(255,255,255,.92); letter-spacing: .04em;
   text-shadow: 0 2px 18px rgba(0,0,0,.5);
 }
-/* varian body: judul lebih kecil, ada satu paragraf di bawah */
-.space.with-body .title { font-size: 64px; }
-.space .body {
-  margin-top: 34px; max-width: 800px;
-  font-family: var(--sans); font-size: 30px; font-weight: 500; line-height: 1.62;
-  color: rgba(255,255,255,.94); white-space: pre-line;
-  text-shadow: 0 2px 16px rgba(0,0,0,.55);
+/* badge cover = sticker pill miring di kiri atas, bukan tracking caps kaku */
+.space .badge-wrap {
+  position: absolute; top: 84px; left: 84px;
 }
-.space .caps {
-  position: absolute; top: 74px; left: 0; right: 0; text-align: center;
-  font-family: var(--sans); font-size: 22px; font-weight: 600;
-  letter-spacing: .34em; text-transform: uppercase; color: rgba(255,255,255,.82);
+/* catatan tangan cover: kanan bawah, kaya coretan si admin */
+.space .note-wrap {
+  position: absolute; right: 84px; bottom: 108px; text-align: right;
 }
+/* varian body: judul lebih kecil, isi jadi kartu catatan miring */
+.space.with-body .frame { justify-content: flex-start; padding-top: 150px; }
+.space.with-body .title { font-size: 60px; }
+/* kartu catatan: kertas putih miring + selotip, isi Pretendard supaya kebaca */
+.space .note-card {
+  position: absolute; left: 96px; right: 96px; bottom: 120px;
+  background: rgba(248,247,243,.96); color: var(--ink);
+  padding: 58px 60px 50px;
+  transform: rotate(-1.6deg);
+  box-shadow: 0 14px 44px rgba(0,0,0,.4);
+}
+.space .note-card .tape { top: -22px; left: 48%; }
+.space .note-card .body {
+  font-family: var(--sans); font-size: 31px; font-weight: 500; line-height: 1.62;
+  color: #222; white-space: pre-line;
+}
+.space .note-card .body .hl { font-family: var(--hand); font-size: 1.25em; font-style: normal; }
+.space .note-card .memo {
+  margin-top: 22px; font-family: var(--hand); font-size: 46px; color: var(--ink);
+  transform: rotate(-1deg);
+}
+
+/* ---------- masthead: meniru banner triptych "poten STUDIO" mereka ---------- */
+.masthead { position: relative; line-height: .9; }
+.masthead .script {
+  font-family: var(--script); font-weight: 400;
+  display: inline-block; transform: rotate(-6deg);
+}
+.masthead .caps {
+  font-family: var(--caps); font-weight: 400; letter-spacing: .01em;
+  text-transform: uppercase;
+}
+.masthead .aside {
+  font-family: var(--sans); font-weight: 800; letter-spacing: .04em;
+  text-transform: uppercase; white-space: nowrap;
+}
+/* ukuran normal (body-type): masthead jadi kop, konten di bawahnya */
+.masthead.md .script { font-size: 120px; }
+.masthead.md .caps { font-size: 96px; margin-top: -14px; }
+.masthead.md .aside { font-size: 26px; }
+/* ukuran besar (last-type): masthead jadi hero seperti banner grid */
+.masthead.lg .script { font-size: 170px; }
+.masthead.lg .caps { font-size: 136px; margin-top: -20px; }
+.masthead.lg .aside { font-size: 30px; }
+.masthead .row { display: flex; align-items: baseline; gap: 22px; }
+.masthead .row.right { justify-content: flex-end; margin-top: -6px; }
 
 /* ---------- Gaya B: kartu tipografi ---------- */
 /* kicker dipatok di atas, tanda tangan di bawah, isi di tengah — tanpa ini dua
@@ -71,13 +154,9 @@ body {
   background: var(--paper); color: var(--ink);
   padding: 110px 96px; display: flex; flex-direction: column; justify-content: center;
 }
-.type .kicker {
-  position: absolute; top: 110px; left: 96px;
-  font-family: var(--sans); font-size: 22px; font-weight: 700;
-  letter-spacing: .3em; text-transform: uppercase; color: var(--ink);
-}
+.type .masthead { margin-bottom: 64px; }
 .type .title {
-  font-size: 86px; font-weight: 900; line-height: 1.16;
+  font-size: 64px; font-weight: 900; line-height: 1.2;
   letter-spacing: -.015em; white-space: pre-line;
 }
 .type .title .hl { font-style: italic; font-weight: 700; }
@@ -85,6 +164,12 @@ body {
   font-family: var(--sans); font-size: 31px; font-weight: 500; line-height: 1.66;
   color: var(--ink-soft); margin-top: 34px; white-space: pre-line;
 }
+/* coretan tangan hitam di kartu terang */
+.type .memo {
+  margin-top: 40px; font-family: var(--hand); font-size: 50px; color: var(--ink);
+  transform: rotate(-2deg); white-space: pre-line;
+}
+.type .memo::before { content: '→ '; }
 .type .rule { width: 100%; height: 2px; background: var(--ink); margin: 44px 0 0; }
 .type .sign {
   position: absolute; left: 96px; right: 96px; bottom: 100px;
@@ -96,25 +181,24 @@ body {
   letter-spacing: .04em;
 }
 
-/* pill hitam & outline — meniru "LIMIT" / "CREATIVE" di banner mereka */
-.pill {
-  display: inline-block; padding: 6px 26px; border-radius: 999px;
-  font-family: var(--sans); font-size: .62em; font-weight: 800;
-  letter-spacing: .06em; vertical-align: middle;
+/* ---------- kutipan review: sticky note tulisan tangan ---------- */
+.quote { background: var(--paper); color: var(--ink); padding: 110px 90px; display: flex; align-items: center; justify-content: center; }
+.quote .note {
+  position: relative; background: #fff; width: 100%;
+  padding: 96px 76px 84px;
+  transform: rotate(-1.8deg);
+  box-shadow: 0 18px 50px rgba(0,0,0,.16);
 }
-.pill.solid { background: var(--ink); color: var(--paper); }
-.pill.line { border: 3px solid var(--ink); color: var(--ink); }
-
-/* ---------- kutipan review ---------- */
-.quote { background: var(--paper); color: var(--ink); padding: 120px 96px; display: flex; flex-direction: column; justify-content: center; }
-.quote .mark { font-size: 150px; font-weight: 900; line-height: .7; }
+.quote .note .tape { top: -20px; left: 60px; }
+.quote .note .tape.right { top: -20px; left: auto; right: 60px; }
+.quote .mark { font-size: 130px; font-weight: 900; line-height: .6; }
 .quote .text {
-  margin-top: 30px; font-size: 52px; font-weight: 400; line-height: 1.45;
-  white-space: pre-line;
+  margin-top: 26px; font-family: var(--hand); font-size: 60px; font-weight: 400;
+  line-height: 1.35; white-space: pre-line;
 }
-.quote .text .hl { font-style: italic; }
+.quote .text .hl { font-style: normal; background: linear-gradient(transparent 62%, rgba(0,0,0,.12) 62%); }
 .quote .who {
-  position: absolute; left: 96px; bottom: 100px;
+  margin-top: 44px; text-align: right;
   font-family: var(--sans); font-size: 27px; font-weight: 600;
   color: var(--ink-soft); letter-spacing: .02em;
 }

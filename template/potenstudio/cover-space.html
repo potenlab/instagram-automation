@@ -3,15 +3,16 @@
 <head>
 <meta charset="utf-8">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;0,900;1,400;1,700&family=Noto+Serif+KR:wght@400;600;900&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;0,900;1,400;1,700&family=Noto+Serif+KR:wght@400;600;900&family=Nanum+Pen+Script&family=Gaegu:wght@400;700&display=swap">
 <link rel="stylesheet" href="style.css">
 </head>
 <body class="space">
   <div class="bg" style="background-image:url('{{bg_url}}')"></div>
-  <div class="caps">{{badge}}</div>
+  <div class="badge-wrap"><span class="sticker"><span class="pill ghost">{{badge}}</span></span></div>
   <div class="frame">
     <div class="title">{{headline}}</div>
     <div class="sign">{{brand_name}}</div>
   </div>
+  <div class="note-wrap"><div class="hand-note">{{note_hand}}</div></div>
 </body>
 </html>
