@@ -41,6 +41,9 @@
         <label for="topic" style="margin-top:22px">주제 / 기사 URL <span class="opt">선택 — 비우면 AI가 사진을 보고 정합니다</span></label>
         <textarea id="topic" placeholder="예: 포텐스튜디오 공간 소개 / 기사 URL / 비워두기"></textarea>
 
+        <label for="yt_url" style="margin-top:22px">YouTube 영상 링크 <span class="opt">선택 — 영상 프레임과 자막으로 게시물을 만듭니다</span></label>
+        <input type="text" id="yt_url" placeholder="https://www.youtube.com/watch?v=... 또는 shorts 링크">
+
         <label style="margin-top:22px">자료 이미지 <span class="opt" id="fileCount">0 / 10</span></label>
         <div class="dropzone dz-lg" id="dz">
           <div class="dz-icon">+</div>
@@ -308,20 +311,22 @@ $('addFeed').onclick = () => {
 $('f').onsubmit = async (e) => {
   e.preventDefault();
   $('err').textContent = '';
-  if (!$('topic').value.trim() && !picked.length) { $('err').textContent = '주제 또는 자료 이미지를 넣어주세요'; return; }
+  if (!$('topic').value.trim() && !picked.length && !$('yt_url').value.trim()) { $('err').textContent = '주제, 자료 이미지, 또는 YouTube 링크를 넣어주세요'; return; }
   $('submit').disabled = true;
   const fd = new FormData();
   fd.append('brand_id', brandId);
   if (tplChoice) fd.append('template', tplChoice);
   fd.append('topic', $('topic').value.trim());
   fd.append('note', $('note').value);
+  fd.append('yt_url', $('yt_url').value.trim());
   for (const f of picked) fd.append('materials', f);
   try {
     const res = await api('/api/jobs', { method: 'POST', body: fd });
     if (!res.ok) throw new Error((await res.json()).error || '오류가 발생했습니다');
-    picked = []; $('topic').value = ''; $('note').value = '';
+    const j = await res.json();
+    picked = []; $('topic').value = ''; $('note').value = ''; $('yt_url').value = '';
     renderPreviews();
-    toast('자료함에 저장되었습니다 ✓');
+    toast(j.processing ? '영상 처리 중 — 잠시 후 자료함에 나타납니다 (1–3분)' : '자료함에 저장되었습니다 ✓');
     loadStock();
   } catch (err) {
     $('err').textContent = err.message;

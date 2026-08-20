@@ -51,7 +51,7 @@ app.post('/api/login', express.json(), (req, res) => {
 });
 
 // --- brands CRUD ---
-const BRAND_FIELDS = ['name', 'handle', 'discord_channel_id', 'ig_account_id', 'rss_feeds', 'template', 'prompt_rules', 'zernio_api_key', 'drive_folder_id', 'source_urls'];
+const BRAND_FIELDS = ['name', 'handle', 'discord_channel_id', 'ig_account_id', 'rss_feeds', 'template', 'prompt_rules', 'zernio_api_key', 'drive_folder_id', 'source_urls', 'yt_urls'];
 const TEMPLATE_IDX = BRAND_FIELDS.indexOf('template');
 const brandBody = b => BRAND_FIELDS.map(f => String(b[f] ?? ''));
 
@@ -177,10 +177,19 @@ const upload = multer({
 });
 
 app.post('/api/jobs', upload.array('materials', 10), (req, res) => {
-  const { brand_id, topic, note, template } = req.body || {};
+  const { brand_id, topic, note, template, yt_url } = req.body || {};
   const brand = db.prepare('SELECT * FROM brands WHERE id=?').get(brand_id);
   if (!brand) return res.status(400).json({ error: '브랜드를 선택하세요' });
   const files = req.files || [];
+
+  // link YouTube → yt-pull yang urus (unduh + frame + 자막, 1–3 menit, async)
+  if (yt_url && yt_url.trim()) {
+    const child = require('child_process').spawn('node',
+      [path.join(ROOT, 'scripts', 'yt-pull.js'), String(brand.id), '--url', yt_url.trim()],
+      { cwd: ROOT, detached: true, stdio: 'ignore' });
+    child.unref();
+    return res.json({ processing: true, message: '영상 처리 중 — 잠시 후 자료함에 나타납니다 (1–3분)' });
+  }
   if ((!topic || !topic.trim()) && !files.length) return res.status(400).json({ error: '주제 또는 자료 이미지를 넣어주세요' });
 
   const tpl = templateCatalog().some(t => t.id === template) ? template : null; // null = ikut default brand
